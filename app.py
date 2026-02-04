@@ -26,10 +26,10 @@ model.fit(X, y)
 
 # Video recommendation dictionary
 video_links = {
-    "Maths": ["https://www.youtube.com/watch?v=HfACrKJ_Y2w"],
-    "Physics": ["https://www.youtube.com/watch?v=1n6rK2Wq0yM"],
-    "Chemistry": ["https://www.youtube.com/watch?v=FJp8s0N4F5s"],
-    "DSA": ["https://www.youtube.com/watch?v=0IAPZzGSbME"]
+    "Maths": "https://www.youtube.com/results?search_query=engineering+maths+mid1+important+topics",
+    "Physics": "https://www.youtube.com/results?search_query=engineering+physics+mid1+important+topics",
+    "Chemistry": "https://www.youtube.com/results?search_query=engineering+chemistry+mid1+important+topics",
+    "DSA": "https://www.youtube.com/results?search_query=data+structures+mid1+important+topics"
 }
 
 # UI
