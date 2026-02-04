@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-st.title("AI-Based Student Academic Performance Analysis System")
+st.title("AI-Based Student Academic Performance Analysis & Guidance System")
 
 # Load dataset
 data = pd.read_excel("student_data.xlsx")
@@ -24,6 +24,14 @@ y = data['performance_status'].map({'Good':1, 'Poor':0})
 model = LogisticRegression()
 model.fit(X, y)
 
+# Video recommendation dictionary
+video_links = {
+    "Maths": ["https://www.youtube.com/watch?v=HfACrKJ_Y2w"],
+    "Physics": ["https://www.youtube.com/watch?v=1n6rK2Wq0yM"],
+    "Chemistry": ["https://www.youtube.com/watch?v=FJp8s0N4F5s"],
+    "DSA": ["https://www.youtube.com/watch?v=0IAPZzGSbME"]
+}
+
 # UI
 student_id = st.text_input("Enter Student ID (e.g., S10)")
 
@@ -43,5 +51,24 @@ if st.button("Analyze Student"):
         else:
             st.warning("Performance Status: AT RISK (POOR)")
 
-        st.write("Student Details:")
+        # CGPA Prediction (simple logic)
+        total = student_row['mid_1_marks'].values[0] + student_row['assignment_marks'].values[0] + student_row['quiz_marks'].values[0]
+        predicted_cgpa = round((total / 30) * 10, 2)
+        st.write("Predicted CGPA:", predicted_cgpa)
+
+        # Required marks logic
+        if predicted_cgpa < 7:
+            st.error("You need to score at least 15+ in Mid-2 to reach good CGPA.")
+        else:
+            st.success("You are on track for a good CGPA.")
+
+        # Weak subject & videos
+        subject = student_row['subjects'].values[0]
+        if student_row['mid_1_marks'].values[0] < 12:
+            st.warning(f"Weak Subject Detected: {subject}")
+            st.write("Recommended Videos:")
+            for link in video_links.get(subject, []):
+                st.write(link)
+
+        st.subheader("Student Data")
         st.dataframe(student_row)
