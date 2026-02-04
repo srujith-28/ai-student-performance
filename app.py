@@ -34,7 +34,6 @@ video_links = {
 
 # UI
 student_id = st.text_input("Enter Student ID (e.g., S10)")
-
 if st.button("Analyze Student"):
     student_row = data[data['student_id'] == student_id]
 
@@ -51,8 +50,12 @@ if st.button("Analyze Student"):
         else:
             st.warning("Performance Status: AT RISK (POOR)")
 
-        # CGPA Prediction (simple logic)
-        total = student_row['mid_1_marks'].values[0] + student_row['assignment_marks'].values[0] + student_row['quiz_marks'].values[0]
+        # CGPA Prediction
+        total = (
+            student_row['mid_1_marks'].values[0]
+            + student_row['assignment_marks'].values[0]
+            + student_row['quiz_marks'].values[0]
+        )
         predicted_cgpa = round((total / 30) * 10, 2)
         st.write("Predicted CGPA:", predicted_cgpa)
 
@@ -62,10 +65,16 @@ if st.button("Analyze Student"):
         else:
             st.success("You are on track for a good CGPA.")
 
-        # Weak subject & videos
-       subject = student_row['subjects'].values[0]
-if student_row['mid_1_marks'].values[0] < 12:
-    st.warning(f"Weak Subject Detected: {subject}")
-    st.write("Recommended Learning Resources:")
-    st.markdown(f"[Click here for YouTube videos]({video_links.get(subject)})")
+        # Weak subject & video recommendation
+        subject = student_row['subjects'].values[0]
 
+        if student_row['mid_1_marks'].values[0] < 12:
+            st.warning(f"Weak Subject Detected: {subject}")
+            st.write("Recommended Learning Resources:")
+
+            st.markdown(
+                f"[Click here for YouTube videos]({video_links.get(subject)})"
+            )
+
+        st.subheader("Student Data")
+        st.dataframe(student_row)
