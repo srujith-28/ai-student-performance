@@ -63,12 +63,9 @@ if st.button("Analyze Student"):
             st.success("You are on track for a good CGPA.")
 
         # Weak subject & videos
-        subject = student_row['subjects'].values[0]
-        if student_row['mid_1_marks'].values[0] < 12:
-            st.warning(f"Weak Subject Detected: {subject}")
-            st.write("Recommended Videos:")
-            for link in video_links.get(subject, []):
-                st.write(link)
+       subject = student_row['subjects'].values[0]
+if student_row['mid_1_marks'].values[0] < 12:
+    st.warning(f"Weak Subject Detected: {subject}")
+    st.write("Recommended Learning Resources:")
+    st.markdown(f"[Click here for YouTube videos]({video_links.get(subject)})")
 
-        st.subheader("Student Data")
-        st.dataframe(student_row)
