@@ -91,5 +91,23 @@ with tab2:
 
             st.subheader("Student Data")
             st.dataframe(student_row)
+            st.subheader("📊 Academic Performance Overview")
+
+            marks = [
+                student_row['mid_1_marks'].values[0],
+                student_row['assignment_marks'].values[0],
+                student_row['quiz_marks'].values[0]
+            ]
+
+            labels = ["Mid-1", "Assignments", "Quiz"]
+
+            chart_data = pd.DataFrame(
+                {"Marks": marks},
+                index=labels
+            )
+
+            st.bar_chart(chart_data)
+
+
 
 
