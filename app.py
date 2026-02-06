@@ -57,10 +57,16 @@ with tab2:
             features = student_row[['attendance', 'mid_1_marks', 'assignment_marks', 'quiz_marks', 'previous_gpa']]
             prediction = model.predict(features)
 
-            if prediction[0] == 1:
-                st.success("Performance Status: GOOD")
-            else:
-                st.warning("Performance Status: AT RISK (POOR)")
+            probability = model.predict_proba(features)[0][1] * 100
+st.write(f"Performance Probability: {round(probability, 2)} %")
+
+if probability >= 75:
+    st.success("Risk Level: LOW RISK (Good Performance)")
+elif probability >= 50:
+    st.warning("Risk Level: MEDIUM RISK (Needs Improvement)")
+else:
+    st.error("Risk Level: HIGH RISK (At Academic Risk)")
+
 
             total = (
                 student_row['mid_1_marks'].values[0]
