@@ -3,4 +3,6 @@ pandas
 scikit-learn
 openpyxl
 matplotlib
+reportlab
+
 
