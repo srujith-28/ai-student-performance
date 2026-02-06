@@ -2,12 +2,34 @@ import streamlit as st
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 import matplotlib.pyplot as plt
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from io import BytesIO
+
 
 st.set_page_config(page_title="AI Student Performance System", layout="centered")
 
 st.title("AI-Based Student Academic Performance Analysis & Guidance System")
 
 # Tabs
+def generate_pdf(student_id, probability, predicted_cgpa, risk_level):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    elements.append(Paragraph("Student Performance Report", styles['Title']))
+    elements.append(Spacer(1, 12))
+    elements.append(Paragraph(f"Student ID: {student_id}", styles['Normal']))
+    elements.append(Paragraph(f"Performance Probability: {round(probability,2)}%", styles['Normal']))
+    elements.append(Paragraph(f"Risk Level: {risk_level}", styles['Normal']))
+    elements.append(Paragraph(f"Predicted CGPA: {predicted_cgpa}", styles['Normal']))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
 tab1, tab2 = st.tabs(["📂 Data & Model", "🎓 Student Analysis"])
 
 # ---------------- TAB 1 ----------------
@@ -107,6 +129,24 @@ with tab2:
             )
 
             st.bar_chart(chart_data)
+            # Determine risk level text
+            if probability >= 75:
+                risk_level = "Low Risk"
+            elif probability >= 50:
+                risk_level = "Medium Risk"
+            else:
+                risk_level = "High Risk"
+
+            pdf = generate_pdf(student_id, probability, predicted_cgpa, risk_level)
+
+            st.download_button(
+                label="📥 Download Performance Report",
+                data=pdf,
+                file_name=f"{student_id}_report.pdf",
+                mime="application/pdf"
+            )
+
+
 
 
 
