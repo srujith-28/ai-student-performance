@@ -49,48 +49,47 @@ with tab2:
     student_id = st.text_input("Enter Student ID (e.g., S10)")
 
     if st.button("Analyze Student"):
+
         student_row = data[data['student_id'] == student_id]
 
-    if student_row.empty:
-        st.error("Student ID not found!")
-    else:
-        features = student_row[['attendance', 'mid_1_marks', 'assignment_marks', 'quiz_marks', 'previous_gpa']]
-        prediction = model.predict(features)
-
-        # Probability & Risk Level
-        probability = model.predict_proba(features)[0][1] * 100
-        st.write(f"Performance Probability: {round(probability, 2)} %")
-
-        if probability >= 75:
-            st.success("Risk Level: LOW RISK (Good Performance)")
-        elif probability >= 50:
-            st.warning("Risk Level: MEDIUM RISK (Needs Improvement)")
+        if student_row.empty:
+            st.error("Student ID not found!")
         else:
-            st.error("Risk Level: HIGH RISK (At Academic Risk)")
+            features = student_row[['attendance', 'mid_1_marks', 'assignment_marks', 'quiz_marks', 'previous_gpa']]
 
-        # CGPA Prediction
-        total = (
-            student_row['mid_1_marks'].values[0]
-            + student_row['assignment_marks'].values[0]
-            + student_row['quiz_marks'].values[0]
-        )
-        predicted_cgpa = round((total / 30) * 10, 2)
-        st.write("Predicted CGPA:", predicted_cgpa)
+            probability = model.predict_proba(features)[0][1] * 100
+            st.write(f"Performance Probability: {round(probability, 2)} %")
 
-        if predicted_cgpa < 7:
-            st.error("You need to score at least 15+ in Mid-2 to reach good CGPA.")
-        else:
-            st.success("You are on track for a good CGPA.")
+            if probability >= 75:
+                st.success("Risk Level: LOW RISK (Good Performance)")
+            elif probability >= 50:
+                st.warning("Risk Level: MEDIUM RISK (Needs Improvement)")
+            else:
+                st.error("Risk Level: HIGH RISK (At Academic Risk)")
 
-        # Weak Subject & Videos
-        subject = student_row['subjects'].values[0]
-
-        if student_row['mid_1_marks'].values[0] < 12:
-            st.warning(f"Weak Subject Detected: {subject}")
-            st.markdown(
-                f"[Click here for YouTube videos]({video_links.get(subject)})"
+            total = (
+                student_row['mid_1_marks'].values[0]
+                + student_row['assignment_marks'].values[0]
+                + student_row['quiz_marks'].values[0]
             )
 
-        st.subheader("Student Data")
-        st.dataframe(student_row)
+            predicted_cgpa = round((total / 30) * 10, 2)
+            st.write("Predicted CGPA:", predicted_cgpa)
+
+            if predicted_cgpa < 7:
+                st.error("You need to score at least 15+ in Mid-2 to reach good CGPA.")
+            else:
+                st.success("You are on track for a good CGPA.")
+
+            subject = student_row['subjects'].values[0]
+
+            if student_row['mid_1_marks'].values[0] < 12:
+                st.warning(f"Weak Subject Detected: {subject}")
+                st.markdown(
+                    f"[Click here for YouTube videos]({video_links.get(subject)})"
+                )
+
+            st.subheader("Student Data")
+            st.dataframe(student_row)
+
 
