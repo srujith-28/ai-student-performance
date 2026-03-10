@@ -1,46 +1,17 @@
 import streamlit as st
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
+from io import BytesIO
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
 
-# -------- FUNCTION --------
-def classify_performance(row):
-    if row['mid_1_marks'] < 12 or row['attendance'] < 65:
-        return "Poor"
-    else:
-        return "Good"
+# -----------------------------
+# Page Setup
+# -----------------------------
+st.set_page_config(page_title="AI Student Performance System", layout="centered")
 
-
-st.title("AI-Based Student Academic Performance Analysis")
-
-# -------- FILE UPLOAD --------
-uploaded_file = st.file_uploader("Upload Student Data", type=["xlsx"])
-
-if uploaded_file is not None:
-
-    data = pd.read_excel(uploaded_file)
-
-    st.success("Dataset uploaded successfully")
-
-    # apply classification
-    data['performance_status'] = data.apply(classify_performance, axis=1)
-
-    # train model
-    X = data[['attendance','mid_1_marks','assignment_marks','quiz_marks','previous_gpa']]
-    y = data['performance_status'].map({'Good':1,'Poor':0})
-
-    model = LogisticRegression()
-    model.fit(X,y)
-
-    tab1, tab2 = st.tabs(["Dataset Overview","Student Analysis"])
-
-    with tab1:
-        st.dataframe(data.head())
-
-    with tab2:
-        student_id = st.text_input("Enter Student ID")
-
-        if st.button("Analyze Student"):
-            # student analysis code here
+st.title("AI-Based Student Academic Performance Analysis & Guidance System")
 
 # -----------------------------
 # Rule-based classification
@@ -51,27 +22,6 @@ def classify_performance(row):
     else:
         return "Good"
 
-data['performance_status'] = data.apply(classify_performance, axis=1)
-
-# -----------------------------
-# Train AI model
-# -----------------------------
-X = data[['attendance','mid_1_marks','assignment_marks','quiz_marks','previous_gpa']]
-y = data['performance_status'].map({'Good':1,'Poor':0})
-
-model = LogisticRegression()
-model.fit(X,y)
-
-# -----------------------------
-# YouTube recommendation links
-# -----------------------------
-video_links = {
-    "Maths": "https://www.youtube.com/results?search_query=engineering+maths+important+topics",
-    "Physics": "https://www.youtube.com/results?search_query=engineering+physics+important+topics",
-    "Chemistry": "https://www.youtube.com/results?search_query=engineering+chemistry+important+topics",
-    "DSA": "https://www.youtube.com/results?search_query=data+structures+important+topics",
-    "English": "https://www.youtube.com/results?search_query=english+communication+skills"
-}
 
 # -----------------------------
 # PDF Report Generator
@@ -83,14 +33,14 @@ def generate_pdf(student_id, weak_subjects):
     styles = getSampleStyleSheet()
 
     elements = []
-    elements.append(Paragraph("Student Academic Performance Report", styles['Title']))
-    elements.append(Spacer(1,20))
 
+    elements.append(Paragraph("Student Academic Performance Report", styles['Title']))
+    elements.append(Spacer(1, 20))
     elements.append(Paragraph(f"Student ID: {student_id}", styles['Normal']))
-    elements.append(Spacer(1,10))
+    elements.append(Spacer(1, 10))
 
     if weak_subjects:
-        elements.append(Paragraph("Subjects requiring improvement:", styles['Heading3']))
+        elements.append(Paragraph("Subjects Requiring Improvement:", styles['Heading3']))
         for subject in weak_subjects:
             elements.append(Paragraph(subject, styles['Normal']))
     else:
@@ -101,115 +51,163 @@ def generate_pdf(student_id, weak_subjects):
 
     return buffer
 
-# -----------------------------
-# Tabs
-# -----------------------------
-tab1, tab2 = st.tabs(["Dataset Overview","Student Analysis"])
 
 # -----------------------------
-# Tab 1 : Dataset
+# YouTube Resources
 # -----------------------------
-with tab1:
+video_links = {
+    "Maths": "https://www.youtube.com/results?search_query=engineering+maths+important+topics",
+    "Physics": "https://www.youtube.com/results?search_query=engineering+physics+important+topics",
+    "Chemistry": "https://www.youtube.com/results?search_query=engineering+chemistry+important+topics",
+    "DSA": "https://www.youtube.com/results?search_query=data+structures+important+topics",
+    "English": "https://www.youtube.com/results?search_query=english+communication+skills"
+}
 
-    st.subheader("Dataset Preview")
-    st.dataframe(data.head())
-
-    st.write("Total Records:", len(data))
 
 # -----------------------------
-# Tab 2 : Student Analysis
+# Upload Dataset
 # -----------------------------
-with tab2:
+uploaded_file = st.file_uploader("Upload Student Dataset (Excel)", type=["xlsx"])
 
-    st.subheader("Student Performance Analysis")
 
-    student_id = st.text_input("Enter Student ID (example: S1)")
+if uploaded_file is None:
 
-    if st.button("Analyze Student"):
+    st.info("Please upload the dataset to start analysis.")
 
-        student_rows = data[data['student_id'] == student_id]
+else:
 
-        if student_rows.empty:
+    data = pd.read_excel(uploaded_file)
 
-            st.error("Student ID not found!")
+    st.success("Dataset uploaded successfully")
 
-        else:
+    # -----------------------------
+    # Apply rule-based labeling
+    # -----------------------------
+    data['performance_status'] = data.apply(classify_performance, axis=1)
 
-            weak_subjects = []
+    # -----------------------------
+    # Train AI Model
+    # -----------------------------
+    X = data[['attendance','mid_1_marks','assignment_marks','quiz_marks','previous_gpa']]
+    y = data['performance_status'].map({'Good':1,'Poor':0})
 
-            st.subheader("Subject-wise Performance")
+    model = LogisticRegression()
+    model.fit(X,y)
 
-            for index, row in student_rows.iterrows():
+    # -----------------------------
+    # Tabs
+    # -----------------------------
+    tab1, tab2 = st.tabs(["Dataset Overview","Student Analysis"])
 
-                features = pd.DataFrame([[
-                    row['attendance'],
-                    row['mid_1_marks'],
-                    row['assignment_marks'],
-                    row['quiz_marks'],
-                    row['previous_gpa']
-                ]], columns=[
-                    'attendance',
-                    'mid_1_marks',
-                    'assignment_marks',
-                    'quiz_marks',
-                    'previous_gpa'
-                ])
 
-                probability = model.predict_proba(features)[0][1]*100
+    # -----------------------------
+    # Dataset Preview
+    # -----------------------------
+    with tab1:
 
-                st.write(f"Subject: {row['subject']}")
-                st.write(f"Performance Probability: {round(probability,2)}%")
+        st.subheader("Dataset Preview")
 
-                if probability >= 75:
-                    st.success("Good Performance")
-                elif probability >= 50:
-                    st.warning("Average Performance")
-                else:
-                    st.error("Needs Improvement")
-                    weak_subjects.append(row['subject'])
+        st.dataframe(data.head())
 
-                st.write("---")
+        st.write("Total Records:", len(data))
 
-            # -----------------------------
-            # Weak Subject Recommendations
-            # -----------------------------
-            if weak_subjects:
 
-                st.subheader("⚠ Subjects Requiring Improvement")
+    # -----------------------------
+    # Student Analysis
+    # -----------------------------
+    with tab2:
 
-                for subject in weak_subjects:
+        st.subheader("Student Performance Analysis")
 
-                    st.warning(subject)
+        student_id = st.text_input("Enter Student ID (example: S1)")
 
-                    st.markdown(
-                        f"[Recommended Videos for {subject}]({video_links.get(subject)})"
-                    )
+        if st.button("Analyze Student"):
+
+            student_rows = data[data['student_id'] == student_id]
+
+            if student_rows.empty:
+
+                st.error("Student ID not found!")
 
             else:
 
-                st.success("All subjects are performing well.")
+                weak_subjects = []
 
-            # -----------------------------
-            # Chart
-            # -----------------------------
-            chart_data = student_rows[['subject','mid_1_marks']]
-            chart_data = chart_data.set_index('subject')
+                st.subheader("Subject-wise AI Analysis")
 
-            st.subheader("Marks Comparison Across Subjects")
-            st.bar_chart(chart_data)
+                for index, row in student_rows.iterrows():
 
-            # -----------------------------
-            # Download PDF
-            # -----------------------------
-            pdf = generate_pdf(student_id, weak_subjects)
+                    features = pd.DataFrame([[
+                        row['attendance'],
+                        row['mid_1_marks'],
+                        row['assignment_marks'],
+                        row['quiz_marks'],
+                        row['previous_gpa']
+                    ]], columns=[
+                        'attendance',
+                        'mid_1_marks',
+                        'assignment_marks',
+                        'quiz_marks',
+                        'previous_gpa'
+                    ])
 
-            st.download_button(
-                label="Download Performance Report",
-                data=pdf,
-                file_name=f"{student_id}_performance_report.pdf",
-                mime="application/pdf"
-            )
+                    probability = model.predict_proba(features)[0][1] * 100
+
+                    st.write(f"Subject: {row['subject']}")
+                    st.write(f"Performance Probability: {round(probability,2)}%")
+
+                    if probability >= 75:
+                        st.success("Good Performance")
+
+                    elif probability >= 50:
+                        st.warning("Average Performance")
+
+                    else:
+                        st.error("Needs Improvement")
+                        weak_subjects.append(row['subject'])
+
+                    st.write("---")
 
 
+                # -----------------------------
+                # Weak Subject Detection
+                # -----------------------------
+                if weak_subjects:
+
+                    st.subheader("⚠ Subjects Requiring Improvement")
+
+                    for subject in weak_subjects:
+
+                        st.warning(subject)
+
+                        st.markdown(
+                            f"[Recommended Videos for {subject}]({video_links.get(subject)})"
+                        )
+
+                else:
+
+                    st.success("All subjects are performing well.")
 
 
+                # -----------------------------
+                # Subject Comparison Chart
+                # -----------------------------
+                chart_data = student_rows[['subject','mid_1_marks']]
+                chart_data = chart_data.set_index('subject')
+
+                st.subheader("Marks Comparison Across Subjects")
+
+                st.bar_chart(chart_data)
+
+
+                # -----------------------------
+                # Download PDF Report
+                # -----------------------------
+                pdf = generate_pdf(student_id, weak_subjects)
+
+                st.download_button(
+                    label="Download Performance Report",
+                    data=pdf,
+                    file_name=f"{student_id}_report.pdf",
+                    mime="application/pdf"
+                )
