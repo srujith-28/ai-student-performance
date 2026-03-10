@@ -6,26 +6,35 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
-# -----------------------------
-# Page Setup
-# -----------------------------
-st.set_page_config(page_title="AI Student Performance System", layout="centered")
+# --------------------------------------------------
+# PAGE CONFIG
+# --------------------------------------------------
 
-st.title("AI-Based Student Academic Performance Analysis & Guidance System")
+st.set_page_config(page_title="AI Academic Dashboard", layout="wide")
 
-# -----------------------------
-# Rule-based classification
-# -----------------------------
+st.title("🎓 AI-Based Student Academic Performance Dashboard")
+
+st.markdown(
+"""
+Upload a student dataset to analyze academic performance across multiple subjects.
+The system uses AI to detect weak subjects and recommend learning resources.
+"""
+)
+
+# --------------------------------------------------
+# RULE BASED LABEL FUNCTION
+# --------------------------------------------------
+
 def classify_performance(row):
     if row['mid_1_marks'] < 12 or row['attendance'] < 65:
         return "Poor"
     else:
         return "Good"
 
+# --------------------------------------------------
+# PDF REPORT GENERATOR
+# --------------------------------------------------
 
-# -----------------------------
-# PDF Report Generator
-# -----------------------------
 def generate_pdf(student_id, weak_subjects):
 
     buffer = BytesIO()
@@ -34,27 +43,29 @@ def generate_pdf(student_id, weak_subjects):
 
     elements = []
 
-    elements.append(Paragraph("Student Academic Performance Report", styles['Title']))
-    elements.append(Spacer(1, 20))
+    elements.append(Paragraph("Student Performance Report", styles['Title']))
+    elements.append(Spacer(1,20))
     elements.append(Paragraph(f"Student ID: {student_id}", styles['Normal']))
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1,10))
 
     if weak_subjects:
-        elements.append(Paragraph("Subjects Requiring Improvement:", styles['Heading3']))
+        elements.append(Paragraph("Subjects requiring improvement:", styles['Heading3']))
         for subject in weak_subjects:
             elements.append(Paragraph(subject, styles['Normal']))
     else:
         elements.append(Paragraph("All subjects performing well.", styles['Normal']))
 
     doc.build(elements)
+
     buffer.seek(0)
 
     return buffer
 
 
-# -----------------------------
-# YouTube Resources
-# -----------------------------
+# --------------------------------------------------
+# VIDEO RESOURCES
+# --------------------------------------------------
+
 video_links = {
     "Maths": "https://www.youtube.com/results?search_query=engineering+maths+important+topics",
     "Physics": "https://www.youtube.com/results?search_query=engineering+physics+important+topics",
@@ -64,15 +75,15 @@ video_links = {
 }
 
 
-# -----------------------------
-# Upload Dataset
-# -----------------------------
-uploaded_file = st.file_uploader("Upload Student Dataset (Excel)", type=["xlsx"])
+# --------------------------------------------------
+# FILE UPLOAD
+# --------------------------------------------------
 
+uploaded_file = st.file_uploader("📂 Upload Student Dataset (Excel)", type=["xlsx"])
 
 if uploaded_file is None:
 
-    st.info("Please upload the dataset to start analysis.")
+    st.info("Please upload the student dataset to start analysis.")
 
 else:
 
@@ -80,46 +91,55 @@ else:
 
     st.success("Dataset uploaded successfully")
 
-    # -----------------------------
-    # Apply rule-based labeling
-    # -----------------------------
+    # --------------------------------------------------
+    # CREATE LABELS
+    # --------------------------------------------------
+
     data['performance_status'] = data.apply(classify_performance, axis=1)
 
-    # -----------------------------
-    # Train AI Model
-    # -----------------------------
+    # --------------------------------------------------
+    # TRAIN MODEL
+    # --------------------------------------------------
+
     X = data[['attendance','mid_1_marks','assignment_marks','quiz_marks','previous_gpa']]
     y = data['performance_status'].map({'Good':1,'Poor':0})
 
     model = LogisticRegression()
     model.fit(X,y)
 
-    # -----------------------------
-    # Tabs
-    # -----------------------------
-    tab1, tab2 = st.tabs(["Dataset Overview","Student Analysis"])
+    # --------------------------------------------------
+    # TABS
+    # --------------------------------------------------
 
+    tab1, tab2 = st.tabs(["📊 Dataset Overview","🎓 Student Analysis"])
 
-    # -----------------------------
-    # Dataset Preview
-    # -----------------------------
+    # --------------------------------------------------
+    # DATASET TAB
+    # --------------------------------------------------
+
     with tab1:
 
-        st.subheader("Dataset Preview")
+        st.markdown("## Dataset Preview")
 
         st.dataframe(data.head())
 
-        st.write("Total Records:", len(data))
+        st.divider()
+
+        col1, col2 = st.columns(2)
+
+        col1.metric("Total Records", len(data))
+        col2.metric("Unique Students", data['student_id'].nunique())
 
 
-    # -----------------------------
-    # Student Analysis
-    # -----------------------------
+    # --------------------------------------------------
+    # STUDENT ANALYSIS TAB
+    # --------------------------------------------------
+
     with tab2:
 
-        st.subheader("Student Performance Analysis")
+        st.markdown("## Student Performance Analysis")
 
-        student_id = st.text_input("Enter Student ID (example: S1)")
+        student_id = st.text_input("Enter Student ID (Example: S1)")
 
         if st.button("Analyze Student"):
 
@@ -127,13 +147,13 @@ else:
 
             if student_rows.empty:
 
-                st.error("Student ID not found!")
+                st.error("Student ID not found")
 
             else:
 
                 weak_subjects = []
 
-                st.subheader("Subject-wise AI Analysis")
+                st.markdown("### Subject-wise AI Evaluation")
 
                 for index, row in student_rows.iterrows():
 
@@ -153,8 +173,11 @@ else:
 
                     probability = model.predict_proba(features)[0][1] * 100
 
-                    st.write(f"Subject: {row['subject']}")
-                    st.write(f"Performance Probability: {round(probability,2)}%")
+                    col1, col2, col3 = st.columns(3)
+
+                    col1.metric("Subject", row['subject'])
+                    col2.metric("Mid-1 Marks", row['mid_1_marks'])
+                    col3.metric("Performance Probability", f"{round(probability,2)}%")
 
                     if probability >= 75:
                         st.success("Good Performance")
@@ -166,47 +189,53 @@ else:
                         st.error("Needs Improvement")
                         weak_subjects.append(row['subject'])
 
-                    st.write("---")
+                    st.divider()
 
+                # --------------------------------------------------
+                # WEAK SUBJECT SECTION
+                # --------------------------------------------------
 
-                # -----------------------------
-                # Weak Subject Detection
-                # -----------------------------
                 if weak_subjects:
 
-                    st.subheader("⚠ Subjects Requiring Improvement")
+                    st.markdown("## ⚠ Subjects Requiring Improvement")
 
                     for subject in weak_subjects:
 
-                        st.warning(subject)
+                        with st.expander(f"Improve {subject}"):
 
-                        st.markdown(
-                            f"[Recommended Videos for {subject}]({video_links.get(subject)})"
-                        )
+                            st.write("Recommended learning resources:")
+
+                            st.markdown(
+                                f"[Watch videos for {subject}]({video_links.get(subject)})"
+                            )
 
                 else:
 
-                    st.success("All subjects are performing well.")
+                    st.success("🎉 All subjects are performing well.")
 
+                # --------------------------------------------------
+                # CHART
+                # --------------------------------------------------
 
-                # -----------------------------
-                # Subject Comparison Chart
-                # -----------------------------
+                st.markdown("## 📈 Subject Marks Comparison")
+
                 chart_data = student_rows[['subject','mid_1_marks']]
                 chart_data = chart_data.set_index('subject')
 
-                st.subheader("Marks Comparison Across Subjects")
-
                 st.bar_chart(chart_data)
 
+                st.divider()
 
-                # -----------------------------
-                # Download PDF Report
-                # -----------------------------
+                # --------------------------------------------------
+                # PDF REPORT
+                # --------------------------------------------------
+
+                st.markdown("## 📄 Download Performance Report")
+
                 pdf = generate_pdf(student_id, weak_subjects)
 
                 st.download_button(
-                    label="Download Performance Report",
+                    label="Download Report",
                     data=pdf,
                     file_name=f"{student_id}_report.pdf",
                     mime="application/pdf"
