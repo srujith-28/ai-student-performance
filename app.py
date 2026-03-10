@@ -13,7 +13,12 @@ st.title("AI-Based Student Academic Performance Analysis & Guidance System")
 # -----------------------------
 # Load dataset
 # -----------------------------
-data = pd.read_excel("student_data.xlsx")
+st.title("AI-Based Student Academic Performance Analysis & Guidance System")
+
+uploaded_file = st.file_uploader("Upload Student Data", type=["xlsx"])
+
+if uploaded_file is not None:
+    data = pd.read_excel(uploaded_file)
 
 # -----------------------------
 # Rule-based classification
@@ -182,4 +187,5 @@ with tab2:
                 file_name=f"{student_id}_performance_report.pdf",
                 mime="application/pdf"
             )
+
 
