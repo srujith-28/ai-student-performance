@@ -13,12 +13,34 @@ st.title("AI-Based Student Academic Performance Analysis & Guidance System")
 # -----------------------------
 # Load dataset
 # -----------------------------
-st.title("AI-Based Student Academic Performance Analysis & Guidance System")
-
 uploaded_file = st.file_uploader("Upload Student Data", type=["xlsx"])
 
 if uploaded_file is not None:
+
     data = pd.read_excel(uploaded_file)
+
+    st.success("Dataset uploaded successfully")
+
+    # rule-based classification
+    data['performance_status'] = data.apply(classify_performance, axis=1)
+
+    # train model
+    X = data[['attendance','mid_1_marks','assignment_marks','quiz_marks','previous_gpa']]
+    y = data['performance_status'].map({'Good':1,'Poor':0})
+
+    model = LogisticRegression()
+    model.fit(X,y)
+
+    tab1, tab2 = st.tabs(["Dataset Overview","Student Analysis"])
+
+    with tab1:
+        st.dataframe(data.head())
+
+    with tab2:
+        student_id = st.text_input("Enter Student ID")
+
+        if st.button("Analyze Student"):
+            # student analysis code here
 
 # -----------------------------
 # Rule-based classification
@@ -187,5 +209,6 @@ with tab2:
                 file_name=f"{student_id}_performance_report.pdf",
                 mime="application/pdf"
             )
+
 
 
