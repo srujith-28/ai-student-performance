@@ -1,18 +1,18 @@
 import streamlit as st
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
-from io import BytesIO
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
 
-st.set_page_config(page_title="AI Student Performance System", layout="centered")
+# -------- FUNCTION --------
+def classify_performance(row):
+    if row['mid_1_marks'] < 12 or row['attendance'] < 65:
+        return "Poor"
+    else:
+        return "Good"
 
-st.title("AI-Based Student Academic Performance Analysis & Guidance System")
 
-# -----------------------------
-# Load dataset
-# -----------------------------
+st.title("AI-Based Student Academic Performance Analysis")
+
+# -------- FILE UPLOAD --------
 uploaded_file = st.file_uploader("Upload Student Data", type=["xlsx"])
 
 if uploaded_file is not None:
@@ -21,7 +21,7 @@ if uploaded_file is not None:
 
     st.success("Dataset uploaded successfully")
 
-    # rule-based classification
+    # apply classification
     data['performance_status'] = data.apply(classify_performance, axis=1)
 
     # train model
@@ -209,6 +209,7 @@ with tab2:
                 file_name=f"{student_id}_performance_report.pdf",
                 mime="application/pdf"
             )
+
 
 
 
