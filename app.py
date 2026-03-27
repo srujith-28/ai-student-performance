@@ -9,20 +9,14 @@ from reportlab.lib.styles import getSampleStyleSheet
 # --------------------------------------------------
 # PAGE CONFIG
 # --------------------------------------------------
-
 st.set_page_config(page_title="AI Academic Dashboard", layout="wide")
 
 st.title("🎓 AI-Based Student Academic Performance Dashboard")
 
-st.markdown(
-"""
-Upload a student dataset to analyze academic performance across multiple subjects.
-The system uses AI to detect weak subjects and recommend learning resources.
-"""
-)
+st.markdown("Upload dataset to analyze student performance and compare sections.")
 
 # --------------------------------------------------
-# RULE BASED LABEL FUNCTION
+# FUNCTIONS
 # --------------------------------------------------
 
 def classify_performance(row):
@@ -31,75 +25,52 @@ def classify_performance(row):
     else:
         return "Good"
 
-# --------------------------------------------------
-# PDF REPORT GENERATOR
-# --------------------------------------------------
+def get_weak_students(df):
+    return df[(df['mid_1_marks'] < 12) | (df['attendance'] < 65)]
 
 def generate_pdf(student_id, weak_subjects):
-
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     styles = getSampleStyleSheet()
 
     elements = []
-
     elements.append(Paragraph("Student Performance Report", styles['Title']))
-    elements.append(Spacer(1,20))
+    elements.append(Spacer(1, 20))
     elements.append(Paragraph(f"Student ID: {student_id}", styles['Normal']))
-    elements.append(Spacer(1,10))
+    elements.append(Spacer(1, 10))
 
     if weak_subjects:
-        elements.append(Paragraph("Subjects requiring improvement:", styles['Heading3']))
-        for subject in weak_subjects:
-            elements.append(Paragraph(subject, styles['Normal']))
+        elements.append(Paragraph("Subjects needing improvement:", styles['Heading3']))
+        for sub in weak_subjects:
+            elements.append(Paragraph(sub, styles['Normal']))
     else:
         elements.append(Paragraph("All subjects performing well.", styles['Normal']))
 
     doc.build(elements)
-
     buffer.seek(0)
-
     return buffer
 
-
-# --------------------------------------------------
-# VIDEO RESOURCES
-# --------------------------------------------------
-
 video_links = {
-    "Maths": "https://www.youtube.com/results?search_query=engineering+maths+important+topics",
-    "Physics": "https://www.youtube.com/results?search_query=engineering+physics+important+topics",
-    "Chemistry": "https://www.youtube.com/results?search_query=engineering+chemistry+important+topics",
-    "DSA": "https://www.youtube.com/results?search_query=data+structures+important+topics",
-    "English": "https://www.youtube.com/results?search_query=english+communication+skills"
+    "Maths": "https://www.youtube.com/results?search_query=engineering+maths",
+    "Physics": "https://www.youtube.com/results?search_query=engineering+physics",
+    "Chemistry": "https://www.youtube.com/results?search_query=engineering+chemistry",
+    "DSA": "https://www.youtube.com/results?search_query=data+structures",
+    "English": "https://www.youtube.com/results?search_query=communication+skills"
 }
 
-
 # --------------------------------------------------
-# FILE UPLOAD
+# FILE UPLOAD (MAIN DATASET)
 # --------------------------------------------------
 
-uploaded_file = st.file_uploader("📂 Upload Student Dataset (Excel)", type=["xlsx"])
+uploaded_file = st.file_uploader("📂 Upload Main Student Dataset", type=["xlsx"])
 
 if uploaded_file is None:
-
-    st.info("Please upload the student dataset to start analysis.")
+    st.info("Upload dataset to begin analysis.")
 
 else:
-
     data = pd.read_excel(uploaded_file)
 
-    st.success("Dataset uploaded successfully")
-
-    # --------------------------------------------------
-    # CREATE LABELS
-    # --------------------------------------------------
-
     data['performance_status'] = data.apply(classify_performance, axis=1)
-
-    # --------------------------------------------------
-    # TRAIN MODEL
-    # --------------------------------------------------
 
     X = data[['attendance','mid_1_marks','assignment_marks','quiz_marks','previous_gpa']]
     y = data['performance_status'].map({'Good':1,'Poor':0})
@@ -110,52 +81,42 @@ else:
     # --------------------------------------------------
     # TABS
     # --------------------------------------------------
-
-    tab1, tab2 = st.tabs(["📊 Dataset Overview","🎓 Student Analysis"])
+    tab1, tab2, tab3 = st.tabs([
+        "📊 Dataset Overview",
+        "🎓 Student Analysis",
+        "🏫 Section Comparison"
+    ])
 
     # --------------------------------------------------
-    # DATASET TAB
+    # TAB 1
     # --------------------------------------------------
-
     with tab1:
-
-        st.markdown("## Dataset Preview")
-
         st.dataframe(data.head())
 
-        st.divider()
-
         col1, col2 = st.columns(2)
-
         col1.metric("Total Records", len(data))
-        col2.metric("Unique Students", data['student_id'].nunique())
-
+        col2.metric("Students", data['student_id'].nunique())
 
     # --------------------------------------------------
-    # STUDENT ANALYSIS TAB
+    # TAB 2 (STUDENT ANALYSIS)
     # --------------------------------------------------
-
     with tab2:
 
-        st.markdown("## Student Performance Analysis")
+        st.subheader("Student Performance Analysis")
 
-        student_id = st.text_input("Enter Student ID (Example: S1)")
+        student_id = st.text_input("Enter Student ID")
 
         if st.button("Analyze Student"):
 
             student_rows = data[data['student_id'] == student_id]
 
             if student_rows.empty:
-
-                st.error("Student ID not found")
+                st.error("Student not found")
 
             else:
-
                 weak_subjects = []
 
-                st.markdown("### Subject-wise AI Evaluation")
-
-                for index, row in student_rows.iterrows():
+                for _, row in student_rows.iterrows():
 
                     features = pd.DataFrame([[
                         row['attendance'],
@@ -163,80 +124,86 @@ else:
                         row['assignment_marks'],
                         row['quiz_marks'],
                         row['previous_gpa']
-                    ]], columns=[
-                        'attendance',
-                        'mid_1_marks',
-                        'assignment_marks',
-                        'quiz_marks',
-                        'previous_gpa'
-                    ])
+                    ]], columns=X.columns)
 
-                    probability = model.predict_proba(features)[0][1] * 100
+                    prob = model.predict_proba(features)[0][1]*100
 
                     col1, col2, col3 = st.columns(3)
-
                     col1.metric("Subject", row['subject'])
-                    col2.metric("Mid-1 Marks", row['mid_1_marks'])
-                    col3.metric("Performance Probability", f"{round(probability,2)}%")
+                    col2.metric("Marks", row['mid_1_marks'])
+                    col3.metric("Performance", f"{round(prob,2)}%")
 
-                    if probability >= 75:
-                        st.success("Good Performance")
-
-                    elif probability >= 50:
-                        st.warning("Average Performance")
-
-                    else:
-                        st.error("Needs Improvement")
+                    if prob < 50:
                         weak_subjects.append(row['subject'])
+                        st.error("Needs Improvement")
+                    elif prob < 75:
+                        st.warning("Average")
+                    else:
+                        st.success("Good")
 
                     st.divider()
 
-                # --------------------------------------------------
-                # WEAK SUBJECT SECTION
-                # --------------------------------------------------
-
                 if weak_subjects:
+                    st.subheader("⚠ Weak Subjects")
+                    for sub in weak_subjects:
+                        with st.expander(sub):
+                            st.markdown(f"[Learn {sub}]({video_links.get(sub)})")
 
-                    st.markdown("## ⚠ Subjects Requiring Improvement")
-
-                    for subject in weak_subjects:
-
-                        with st.expander(f"Improve {subject}"):
-
-                            st.write("Recommended learning resources:")
-
-                            st.markdown(
-                                f"[Watch videos for {subject}]({video_links.get(subject)})"
-                            )
-
-                else:
-
-                    st.success("🎉 All subjects are performing well.")
-
-                # --------------------------------------------------
-                # CHART
-                # --------------------------------------------------
-
-                st.markdown("## 📈 Subject Marks Comparison")
-
-                chart_data = student_rows[['subject','mid_1_marks']]
-                chart_data = chart_data.set_index('subject')
-
+                chart_data = student_rows[['subject','mid_1_marks']].set_index('subject')
                 st.bar_chart(chart_data)
 
-                st.divider()
-
-                # --------------------------------------------------
-                # PDF REPORT
-                # --------------------------------------------------
-
-                st.markdown("## 📄 Download Performance Report")
-
                 pdf = generate_pdf(student_id, weak_subjects)
+                st.download_button("Download Report", pdf, f"{student_id}.pdf")
 
-                st.download_button(
-                    label="Download Report",
-                    data=pdf,
-                    file_name=f"{student_id}_report.pdf",
-                    mime="application/pdf"
-                )
+    # --------------------------------------------------
+    # TAB 3 (SECTION COMPARISON)
+    # --------------------------------------------------
+    with tab3:
+
+        st.subheader("Multi-Section Comparison")
+
+        uploaded_files = st.file_uploader(
+            "Upload Section Files",
+            type=["xlsx"],
+            accept_multiple_files=True
+        )
+
+        if uploaded_files:
+
+            sections = {}
+            summary = []
+
+            for i, file in enumerate(uploaded_files):
+                name = f"Section {chr(65+i)}"
+                df = pd.read_excel(file)
+                sections[name] = df
+
+            for sec, df in sections.items():
+
+                weak = get_weak_students(df)
+
+                summary.append({
+                    "Section": sec,
+                    "Total": df['student_id'].nunique(),
+                    "Weak": weak['student_id'].nunique(),
+                    "Avg Marks": round(df['mid_1_marks'].mean(),2)
+                })
+
+            summary_df = pd.DataFrame(summary)
+
+            st.dataframe(summary_df)
+
+            best = summary_df.loc[summary_df['Avg Marks'].idxmax()]
+            worst = summary_df.loc[summary_df['Weak'].idxmax()]
+
+            col1, col2 = st.columns(2)
+            col1.metric("Best Section", best["Section"])
+            col2.metric("Most Weak Students", worst["Section"])
+
+            st.bar_chart(summary_df.set_index("Section")["Weak"])
+
+            for sec, df in sections.items():
+                weak = get_weak_students(df)
+
+                with st.expander(f"Weak Students - {sec}"):
+                    st.dataframe(weak[['student_id','subject','mid_1_marks','attendance']])
