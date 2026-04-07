@@ -13,6 +13,17 @@ st.set_page_config(page_title="AI Academic Dashboard", layout="wide")
 st.title("🎓 AI-Based Student Academic Performance System")
 
 # -------------------------------
+# LOAD STATIC DATASET
+# -------------------------------
+FILE_PATH = "student_data_multiple_subjects.xlsx"
+
+try:
+    data = pd.read_excel(FILE_PATH)
+except:
+    st.error("Dataset file not found!")
+    st.stop()
+
+# -------------------------------
 # PDF GENERATOR
 # -------------------------------
 def generate_pdf(student_id, weak_subjects, risk_level):
@@ -25,218 +36,200 @@ def generate_pdf(student_id, weak_subjects, risk_level):
     elements.append(Spacer(1, 20))
     elements.append(Paragraph(f"Student ID: {student_id}", styles['Normal']))
     elements.append(Paragraph(f"Risk Level: {risk_level}", styles['Normal']))
-    elements.append(Spacer(1, 10))
 
     if weak_subjects:
         elements.append(Paragraph("Weak Subjects:", styles['Heading3']))
         for sub in weak_subjects:
             elements.append(Paragraph(sub, styles['Normal']))
     else:
-        elements.append(Paragraph("No weak subjects detected.", styles['Normal']))
+        elements.append(Paragraph("No weak subjects", styles['Normal']))
 
     doc.build(elements)
     buffer.seek(0)
     return buffer
 
 # -------------------------------
-# FILE UPLOAD
+# LABELING
 # -------------------------------
-uploaded_file = st.file_uploader("📂 Upload Student Dataset", type=["xlsx"])
+data['performance_status'] = data.apply(
+    lambda row: "Poor" if row['mid_1_marks'] < 12 or row['attendance'] < 65 else "Good",
+    axis=1
+)
 
-if uploaded_file is None:
-    st.info("Please upload dataset to continue.")
+# -------------------------------
+# TRAIN MODEL
+# -------------------------------
+X = data[['attendance','mid_1_marks','assignment_marks','quiz_marks','previous_gpa']]
+y = data['performance_status'].map({'Good':1,'Poor':0})
 
-else:
-    data = pd.read_excel(uploaded_file)
+model = LogisticRegression()
+model.fit(X, y)
 
-    # -------------------------------
-    # SESSION STATE (for dynamic add)
-    # -------------------------------
-    if "data" not in st.session_state:
-        st.session_state.data = data
+# -------------------------------
+# TABS
+# -------------------------------
+tab1, tab2 = st.tabs(["📊 Dataset", "🎯 Analysis"])
 
-    data = st.session_state.data
+# -------------------------------
+# TAB 1: DATA + ADD STUDENT
+# -------------------------------
+with tab1:
 
-    # -------------------------------
-    # LABELING
-    # -------------------------------
-    data['performance_status'] = data.apply(
-        lambda row: "Poor" if row['mid_1_marks'] < 12 or row['attendance'] < 65 else "Good",
-        axis=1
-    )
+    st.subheader("Dataset Preview")
+    st.dataframe(data.head())
 
-    # -------------------------------
-    # TRAIN MODEL
-    # -------------------------------
-    X = data[['attendance','mid_1_marks','assignment_marks','quiz_marks','previous_gpa']]
-    y = data['performance_status'].map({'Good':1,'Poor':0})
+    col1, col2 = st.columns(2)
+    col1.metric("Total Records", len(data))
+    col2.metric("Students", data['student_id'].nunique())
 
-    model = LogisticRegression()
-    model.fit(X, y)
-
-    # -------------------------------
-    # TABS
-    # -------------------------------
-    tab1, tab2 = st.tabs(["📊 Dataset", "🎯 Analysis"])
+    st.divider()
 
     # -------------------------------
-    # TAB 1: DATASET + ADD STUDENT
+    # ADD STUDENT (SAVED TO EXCEL)
     # -------------------------------
-    with tab1:
+    st.markdown("## ➕ Add New Student Record")
 
-        st.subheader("Dataset Preview")
-        st.dataframe(data.head())
+    with st.form("add_student_form"):
 
-        col1, col2 = st.columns(2)
-        col1.metric("Total Records", len(data))
-        col2.metric("Unique Students", data['student_id'].nunique())
+        new_id = st.text_input("Student ID")
+        new_subject = st.text_input("Subject")
 
-        st.divider()
+        col1, col2, col3 = st.columns(3)
 
-        # -------------------------------
-        # ADD NEW STUDENT
-        # -------------------------------
-        st.markdown("## ➕ Add New Student Record")
+        attendance = col1.number_input("Attendance", 0, 100)
+        mid = col2.number_input("Mid-1 Marks", 0, 25)
+        assignment = col3.number_input("Assignment Marks", 0, 10)
 
-        with st.form("add_student_form"):
+        quiz = st.number_input("Quiz Marks", 0, 10)
+        gpa = st.number_input("Previous GPA", 0.0, 10.0)
 
-            new_id = st.text_input("Student ID")
-            new_subject = st.text_input("Subject")
+        submitted = st.form_submit_button("Add Student")
 
-            col1, col2, col3 = st.columns(3)
+        if submitted:
 
-            attendance = col1.number_input("Attendance", 0, 100)
-            mid = col2.number_input("Mid-1 Marks", 0, 25)
-            assignment = col3.number_input("Assignment Marks", 0, 10)
+            new_row = pd.DataFrame([{
+                "student_id": new_id,
+                "subject": new_subject,
+                "attendance": attendance,
+                "mid_1_marks": mid,
+                "assignment_marks": assignment,
+                "quiz_marks": quiz,
+                "previous_gpa": gpa
+            }])
 
-            quiz = st.number_input("Quiz Marks", 0, 10)
-            gpa = st.number_input("Previous GPA", 0.0, 10.0)
+            # Append to dataset
+            data = pd.concat([data, new_row], ignore_index=True)
 
-            submitted = st.form_submit_button("Add Student")
+            # Save permanently to Excel
+            data.to_excel(FILE_PATH, index=False)
 
-            if submitted:
+            st.success("✅ Student added and saved to dataset!")
 
-                new_row = pd.DataFrame([{
-                    "student_id": new_id,
-                    "subject": new_subject,
-                    "attendance": attendance,
-                    "mid_1_marks": mid,
-                    "assignment_marks": assignment,
-                    "quiz_marks": quiz,
-                    "previous_gpa": gpa
-                }])
+# -------------------------------
+# TAB 2: ANALYSIS
+# -------------------------------
+with tab2:
 
-                st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
+    student_id = st.text_input("Enter Student ID (e.g., S1)")
 
-                st.success("✅ Student added successfully! Refresh analysis.")
+    if st.button("Analyze Student"):
 
-    # -------------------------------
-    # TAB 2: ANALYSIS
-    # -------------------------------
-    with tab2:
+        student_rows = data[data['student_id'] == student_id]
 
-        student_id = st.text_input("Enter Student ID (e.g., S1)")
+        if student_rows.empty:
+            st.error("Student not found!")
+        else:
 
-        if st.button("Analyze Student"):
+            weak_subjects = []
+            avg_marks = student_rows['mid_1_marks'].mean()
 
-            student_rows = data[data['student_id'] == student_id]
+            st.markdown("## 📚 Subject-wise Analysis")
 
-            if student_rows.empty:
-                st.error("Student not found!")
-            else:
+            for _, row in student_rows.iterrows():
 
-                weak_subjects = []
+                features = pd.DataFrame([[
+                    row['attendance'],
+                    row['mid_1_marks'],
+                    row['assignment_marks'],
+                    row['quiz_marks'],
+                    row['previous_gpa']
+                ]], columns=[
+                    'attendance','mid_1_marks','assignment_marks','quiz_marks','previous_gpa'
+                ])
 
-                st.markdown("## 📚 Subject-wise Analysis")
-
-                avg_marks = student_rows['mid_1_marks'].mean()
-
-                for _, row in student_rows.iterrows():
-
-                    features = pd.DataFrame([[
-                        row['attendance'],
-                        row['mid_1_marks'],
-                        row['assignment_marks'],
-                        row['quiz_marks'],
-                        row['previous_gpa']
-                    ]], columns=[
-                        'attendance','mid_1_marks','assignment_marks','quiz_marks','previous_gpa'
-                    ])
-
-                    prob = model.predict_proba(features)[0][1] * 100
-
-                    col1, col2, col3 = st.columns(3)
-
-                    col1.metric("Subject", row['subject'])
-                    col2.metric("Marks", row['mid_1_marks'])
-                    col3.metric("AI Score", f"{round(prob,2)}%")
-
-                    if row['mid_1_marks'] < avg_marks:
-                        st.error("Needs Improvement")
-                        weak_subjects.append(row['subject'])
-                    else:
-                        st.success("Good Performance")
-
-                    st.divider()
-
-                # -------------------------------
-                # RISK SCORE
-                # -------------------------------
-                weak_count = len(weak_subjects)
-                total = len(student_rows)
-
-                risk_ratio = weak_count / total
-
-                st.markdown("## 🎯 Overall Performance")
+                prob = model.predict_proba(features)[0][1] * 100
 
                 col1, col2, col3 = st.columns(3)
 
-                col1.metric("Subjects", total)
-                col2.metric("Weak Subjects", weak_count)
+                col1.metric("Subject", row['subject'])
+                col2.metric("Marks", row['mid_1_marks'])
+                col3.metric("AI Score", f"{round(prob,2)}%")
 
-                if risk_ratio < 0.3:
-                    risk_level = "LOW"
-                    col3.success("Risk: LOW")
-                elif risk_ratio < 0.6:
-                    risk_level = "MEDIUM"
-                    col3.warning("Risk: MEDIUM")
+                if row['mid_1_marks'] < avg_marks:
+                    st.error("Needs Improvement")
+                    weak_subjects.append(row['subject'])
                 else:
-                    risk_level = "HIGH"
-                    col3.error("Risk: HIGH")
+                    st.success("Good Performance")
 
-                # -------------------------------
-                # VIDEO RECOMMENDATION (DYNAMIC)
-                # -------------------------------
-                if weak_subjects:
-                    st.markdown("## 🎥 Recommended Resources")
+                st.divider()
 
-                    for subject in weak_subjects:
-                        query = f"{subject} mid exam important topics"
-                        st.markdown(
-                            f"[Watch {subject} videos](https://www.youtube.com/results?search_query={query})"
-                        )
+            # -------------------------------
+            # RISK SCORE
+            # -------------------------------
+            weak_count = len(weak_subjects)
+            total = len(student_rows)
+            ratio = weak_count / total
 
-                else:
-                    st.success("No recommendations needed!")
+            st.markdown("## 🎯 Overall Performance")
 
-                # -------------------------------
-                # CHART
-                # -------------------------------
-                st.markdown("## 📈 Performance Chart")
+            col1, col2, col3 = st.columns(3)
 
-                chart_data = student_rows[['subject','mid_1_marks']].set_index('subject')
-                st.bar_chart(chart_data)
+            col1.metric("Subjects", total)
+            col2.metric("Weak Subjects", weak_count)
 
-                # -------------------------------
-                # PDF
-                # -------------------------------
-                st.markdown("## 📄 Download Report")
+            if ratio < 0.3:
+                risk_level = "LOW"
+                col3.success("LOW")
+            elif ratio < 0.6:
+                risk_level = "MEDIUM"
+                col3.warning("MEDIUM")
+            else:
+                risk_level = "HIGH"
+                col3.error("HIGH")
 
-                pdf = generate_pdf(student_id, weak_subjects, risk_level)
+            # -------------------------------
+            # VIDEO RECOMMENDATION
+            # -------------------------------
+            if weak_subjects:
+                st.markdown("## 🎥 Recommended Videos")
 
-                st.download_button(
-                    "Download Report",
-                    data=pdf,
-                    file_name=f"{student_id}_report.pdf",
-                    mime="application/pdf"
-                )
+                for subject in weak_subjects:
+                    query = f"{subject} important topics"
+                    st.markdown(
+                        f"[Watch {subject} videos](https://www.youtube.com/results?search_query={query})"
+                    )
+
+            else:
+                st.success("No recommendations needed!")
+
+            # -------------------------------
+            # CHART
+            # -------------------------------
+            st.markdown("## 📈 Performance Chart")
+
+            chart_data = student_rows[['subject','mid_1_marks']].set_index('subject')
+            st.bar_chart(chart_data)
+
+            # -------------------------------
+            # PDF
+            # -------------------------------
+            st.markdown("## 📄 Download Report")
+
+            pdf = generate_pdf(student_id, weak_subjects, risk_level)
+
+            st.download_button(
+                "Download Report",
+                data=pdf,
+                file_name=f"{student_id}_report.pdf",
+                mime="application/pdf"
+            )
