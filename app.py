@@ -10,7 +10,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 # PAGE CONFIG
 # -------------------------------
 st.set_page_config(page_title="AI Academic Dashboard", layout="wide")
-st.title("🎓 AI-Based Student Academic Performance System (Dynamic)")
+st.title("🎓 AI-Based Student Academic Performance System")
 
 # -------------------------------
 # PDF GENERATOR
@@ -50,7 +50,15 @@ else:
     data = pd.read_excel(uploaded_file)
 
     # -------------------------------
-    # DYNAMIC LABELING
+    # SESSION STATE (for dynamic add)
+    # -------------------------------
+    if "data" not in st.session_state:
+        st.session_state.data = data
+
+    data = st.session_state.data
+
+    # -------------------------------
+    # LABELING
     # -------------------------------
     data['performance_status'] = data.apply(
         lambda row: "Poor" if row['mid_1_marks'] < 12 or row['attendance'] < 65 else "Good",
@@ -72,16 +80,58 @@ else:
     tab1, tab2 = st.tabs(["📊 Dataset", "🎯 Analysis"])
 
     # -------------------------------
-    # DATASET VIEW
+    # TAB 1: DATASET + ADD STUDENT
     # -------------------------------
     with tab1:
+
         st.subheader("Dataset Preview")
         st.dataframe(data.head())
-        st.metric("Total Records", len(data))
-        st.metric("Unique Students", data['student_id'].nunique())
+
+        col1, col2 = st.columns(2)
+        col1.metric("Total Records", len(data))
+        col2.metric("Unique Students", data['student_id'].nunique())
+
+        st.divider()
+
+        # -------------------------------
+        # ADD NEW STUDENT
+        # -------------------------------
+        st.markdown("## ➕ Add New Student Record")
+
+        with st.form("add_student_form"):
+
+            new_id = st.text_input("Student ID")
+            new_subject = st.text_input("Subject")
+
+            col1, col2, col3 = st.columns(3)
+
+            attendance = col1.number_input("Attendance", 0, 100)
+            mid = col2.number_input("Mid-1 Marks", 0, 25)
+            assignment = col3.number_input("Assignment Marks", 0, 10)
+
+            quiz = st.number_input("Quiz Marks", 0, 10)
+            gpa = st.number_input("Previous GPA", 0.0, 10.0)
+
+            submitted = st.form_submit_button("Add Student")
+
+            if submitted:
+
+                new_row = pd.DataFrame([{
+                    "student_id": new_id,
+                    "subject": new_subject,
+                    "attendance": attendance,
+                    "mid_1_marks": mid,
+                    "assignment_marks": assignment,
+                    "quiz_marks": quiz,
+                    "previous_gpa": gpa
+                }])
+
+                st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
+
+                st.success("✅ Student added successfully! Refresh analysis.")
 
     # -------------------------------
-    # STUDENT ANALYSIS
+    # TAB 2: ANALYSIS
     # -------------------------------
     with tab2:
 
@@ -96,7 +146,6 @@ else:
             else:
 
                 weak_subjects = []
-                probabilities = []
 
                 st.markdown("## 📚 Subject-wise Analysis")
 
@@ -115,7 +164,6 @@ else:
                     ])
 
                     prob = model.predict_proba(features)[0][1] * 100
-                    probabilities.append(prob)
 
                     col1, col2, col3 = st.columns(3)
 
@@ -123,9 +171,6 @@ else:
                     col2.metric("Marks", row['mid_1_marks'])
                     col3.metric("AI Score", f"{round(prob,2)}%")
 
-                    # -------------------------------
-                    # DYNAMIC WEAK DETECTION
-                    # -------------------------------
                     if row['mid_1_marks'] < avg_marks:
                         st.error("Needs Improvement")
                         weak_subjects.append(row['subject'])
@@ -135,7 +180,7 @@ else:
                     st.divider()
 
                 # -------------------------------
-                # DYNAMIC RISK SCORE
+                # RISK SCORE
                 # -------------------------------
                 weak_count = len(weak_subjects)
                 total = len(student_rows)
@@ -160,10 +205,10 @@ else:
                     col3.error("Risk: HIGH")
 
                 # -------------------------------
-                # DYNAMIC VIDEO RECOMMENDATION
+                # VIDEO RECOMMENDATION (DYNAMIC)
                 # -------------------------------
                 if weak_subjects:
-                    st.markdown("## 🎥 Recommended Learning Resources")
+                    st.markdown("## 🎥 Recommended Resources")
 
                     for subject in weak_subjects:
                         query = f"{subject} mid exam important topics"
@@ -183,7 +228,7 @@ else:
                 st.bar_chart(chart_data)
 
                 # -------------------------------
-                # PDF DOWNLOAD
+                # PDF
                 # -------------------------------
                 st.markdown("## 📄 Download Report")
 
