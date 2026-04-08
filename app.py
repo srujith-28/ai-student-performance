@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import os
 from sklearn.linear_model import LogisticRegression
 from io import BytesIO
 
@@ -8,26 +7,20 @@ st.set_page_config(layout="wide")
 st.title("🎓 AI Student Performance System")
 
 # -------------------------------
-# FILE PATH (for permanent save)
-# -------------------------------
-FILE_PATH = "student_data_multiple_subjects.xlsx"
-
-# -------------------------------
-# LOAD DATA
+# UPLOAD DATASET
 # -------------------------------
 uploaded_file = st.file_uploader("Upload Excel Dataset", type=["xlsx"])
 
-if uploaded_file is None and not os.path.exists(FILE_PATH):
+if uploaded_file is None:
     st.warning("Upload dataset to continue")
     st.stop()
 
+# -------------------------------
+# SESSION STATE
+# -------------------------------
 if "data" not in st.session_state:
-    if uploaded_file is not None:
-        st.session_state.data = pd.read_excel(uploaded_file)
-    else:
-        st.session_state.data = pd.read_excel(FILE_PATH)
+    st.session_state.data = pd.read_excel(uploaded_file)
 
-# BACKUP (for undo)
 if "backup" not in st.session_state:
     st.session_state.backup = st.session_state.data.copy()
 
@@ -53,11 +46,11 @@ model.fit(X, y)
 tab1, tab2 = st.tabs(["📊 Manage Data", "🎯 Analysis"])
 
 # ===============================
-# TAB 1: DATA MANAGEMENT
+# TAB 1: MANAGE DATA
 # ===============================
 with tab1:
 
-    st.subheader("Dataset")
+    st.subheader("Dataset Preview")
     st.dataframe(data)
 
     st.divider()
@@ -67,9 +60,9 @@ with tab1:
     # -------------------------------
     st.markdown("## ➕ Add Student (Multiple Subjects)")
 
-    with st.form("add_student"):
+    with st.form("add_form"):
 
-        sid = st.text_input("Student ID")
+        sid = st.text_input("Student ID", key="add_id")
 
         subjects = ["Maths","Physics","Chemistry","DSA","English"]
         rows = []
@@ -80,12 +73,12 @@ with tab1:
 
             col1,col2,col3 = st.columns(3)
 
-            att = col1.number_input(f"{sub} Attendance",0,100,key=sub+"a")
-            mid = col2.number_input(f"{sub} Mid Marks",0,25,key=sub+"m")
-            ass = col3.number_input(f"{sub} Assignment",0,10,key=sub+"as")
+            att = col1.number_input(f"{sub} Attendance",0,100,key=f"{sub}_a")
+            mid = col2.number_input(f"{sub} Mid",0,25,key=f"{sub}_m")
+            ass = col3.number_input(f"{sub} Assignment",0,10,key=f"{sub}_as")
 
-            quiz = st.number_input(f"{sub} Quiz",0,10,key=sub+"q")
-            gpa = st.number_input(f"{sub} GPA",0.0,10.0,key=sub+"g")
+            quiz = st.number_input(f"{sub} Quiz",0,10,key=f"{sub}_q")
+            gpa = st.number_input(f"{sub} GPA",0.0,10.0,key=f"{sub}_g")
 
             rows.append({
                 "student_id":sid,
@@ -99,21 +92,24 @@ with tab1:
 
         if st.form_submit_button("Add Student"):
 
-            st.session_state.backup = st.session_state.data.copy()
+            if sid.strip() == "":
+                st.warning("⚠️ Enter Student ID")
+            else:
+                st.session_state.backup = st.session_state.data.copy()
 
-            new_df = pd.DataFrame(rows)
-            st.session_state.data = pd.concat([st.session_state.data, new_df], ignore_index=True)
+                new_df = pd.DataFrame(rows)
+                st.session_state.data = pd.concat([st.session_state.data, new_df], ignore_index=True)
 
-            st.success("✅ Student added!")
+                st.success("✅ Student added")
 
     st.divider()
 
     # -------------------------------
-    # UPDATE FULL FIELDS
+    # UPDATE
     # -------------------------------
     st.markdown("## ✏️ Update Student")
 
-    uid = st.text_input("Enter Student ID")
+    uid = st.text_input("Enter Student ID", key="update_id")
 
     df = st.session_state.data[st.session_state.data['student_id']==uid]
 
@@ -125,14 +121,14 @@ with tab1:
 
             col1,col2,col3 = st.columns(3)
 
-            att = col1.number_input("Attendance",0,100,int(row['attendance']),key=f"att{i}")
-            mid = col2.number_input("Mid",0,25,int(row['mid_1_marks']),key=f"mid{i}")
-            ass = col3.number_input("Assignment",0,10,int(row['assignment_marks']),key=f"ass{i}")
+            att = col1.number_input("Attendance",0,100,int(row['attendance']),key=f"att_{i}")
+            mid = col2.number_input("Mid",0,25,int(row['mid_1_marks']),key=f"mid_{i}")
+            ass = col3.number_input("Assignment",0,10,int(row['assignment_marks']),key=f"ass_{i}")
 
-            quiz = st.number_input("Quiz",0,10,int(row['quiz_marks']),key=f"quiz{i}")
-            gpa = st.number_input("GPA",0.0,10.0,float(row['previous_gpa']),key=f"gpa{i}")
+            quiz = st.number_input("Quiz",0,10,int(row['quiz_marks']),key=f"quiz_{i}")
+            gpa = st.number_input("GPA",0.0,10.0,float(row['previous_gpa']),key=f"gpa_{i}")
 
-            if st.button(f"Update {row['subject']}",key=f"btn{i}"):
+            if st.button(f"Update {row['subject']}", key=f"btn_{i}"):
 
                 st.session_state.backup = st.session_state.data.copy()
 
@@ -141,7 +137,7 @@ with tab1:
                     att, mid, ass, quiz, gpa
                 ]
 
-                st.success("Updated!")
+                st.success("✅ Updated")
 
     st.divider()
 
@@ -150,35 +146,31 @@ with tab1:
     # -------------------------------
     st.markdown("## ❌ Delete Student")
 
-    did = st.text_input("Student ID to delete")
+    did = st.text_input("Student ID to delete", key="delete_id")
 
-    if st.button("Delete"):
+    if st.button("Delete", key="delete_btn"):
 
-        st.session_state.backup = st.session_state.data.copy()
+        if did.strip() == "":
+            st.warning("⚠️ Enter Student ID")
+        elif did not in st.session_state.data['student_id'].values:
+            st.error("❌ Student not found")
+        else:
+            st.session_state.backup = st.session_state.data.copy()
 
-        st.session_state.data = st.session_state.data[
-            st.session_state.data['student_id'] != did
-        ]
+            st.session_state.data = st.session_state.data[
+                st.session_state.data['student_id'] != did
+            ]
 
-        st.success("Deleted!")
+            st.success("✅ Deleted")
 
     st.divider()
 
     # -------------------------------
-    # UNDO FEATURE
+    # UNDO
     # -------------------------------
-    if st.button("↩️ Undo Last Change"):
+    if st.button("↩️ Undo", key="undo_btn"):
         st.session_state.data = st.session_state.backup.copy()
-        st.success("Undo successful!")
-
-    st.divider()
-
-    # -------------------------------
-    # SAVE PERMANENTLY
-    # -------------------------------
-    if st.button("💾 Save to Excel File"):
-        st.session_state.data.to_excel(FILE_PATH, index=False)
-        st.success("Saved permanently!")
+        st.success("Undo done")
 
     st.divider()
 
@@ -194,7 +186,8 @@ with tab1:
     st.download_button(
         "Download Excel",
         output,
-        "updated_student_data.xlsx"
+        "updated_student_data.xlsx",
+        key="download_btn"
     )
 
 # ===============================
@@ -202,9 +195,9 @@ with tab1:
 # ===============================
 with tab2:
 
-    sid = st.text_input("Enter Student ID")
+    sid = st.text_input("Enter Student ID", key="analysis_id")
 
-    if st.button("Analyze"):
+    if st.button("Analyze", key="analyze_btn"):
 
         df = st.session_state.data[st.session_state.data['student_id']==sid]
 
