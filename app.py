@@ -1,84 +1,31 @@
 import streamlit as st
 import pandas as pd
-import os
 from sklearn.linear_model import LogisticRegression
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 
-# -------------------------------
-# PAGE CONFIG
-# -------------------------------
-st.set_page_config(page_title="AI Academic Dashboard", layout="wide")
+st.set_page_config(layout="wide")
+st.title("🎓 AI Student Performance System")
 
 # -------------------------------
-# SIMPLE LOGIN SYSTEM
+# UPLOAD DATASET
 # -------------------------------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
+uploaded_file = st.file_uploader("Upload Excel Dataset", type=["xlsx"])
 
-if not st.session_state.logged_in:
-    st.title("🔐 Login")
-
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-
-    if st.button("Login"):
-        if username == "admin" and password == "admin123":
-            st.session_state.logged_in = True
-            st.success("Login successful")
-            st.rerun()
-        else:
-            st.error("Invalid credentials")
-
-    st.stop()
-
-# -------------------------------
-# MAIN APP
-# -------------------------------
-st.title("🎓 AI-Based Student Academic Performance System")
-
-FILE_PATH = "student_data_multiple_subjects.xlsx"
-
-# -------------------------------
-# LOAD DATA
-# -------------------------------
-uploaded_file = st.file_uploader("Upload Dataset (if file not found)", type=["xlsx"])
-
-if os.path.exists(FILE_PATH):
-    data = pd.read_excel(FILE_PATH)
-elif uploaded_file is not None:
-    data = pd.read_excel(uploaded_file)
-else:
+if uploaded_file is None:
     st.warning("Upload dataset to continue")
     st.stop()
 
-# -------------------------------
-# PDF
-# -------------------------------
-def generate_pdf(student_id, weak, risk):
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
-    styles = getSampleStyleSheet()
-
-    elements = []
-    elements.append(Paragraph("Student Report", styles['Title']))
-    elements.append(Paragraph(f"ID: {student_id}", styles['Normal']))
-    elements.append(Paragraph(f"Risk: {risk}", styles['Normal']))
-
-    for w in weak:
-        elements.append(Paragraph(w, styles['Normal']))
-
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
+data = pd.read_excel(uploaded_file)
 
 # -------------------------------
 # LABEL + MODEL
 # -------------------------------
 data['performance_status'] = data.apply(
-    lambda r: "Poor" if r['mid_1_marks'] < 12 or r['attendance'] < 65 else "Good", axis=1
+    lambda r: "Poor" if r['mid_1_marks'] < 12 or r['attendance'] < 65 else "Good",
+    axis=1
 )
 
 X = data[['attendance','mid_1_marks','assignment_marks','quiz_marks','previous_gpa']]
@@ -98,74 +45,53 @@ tab1, tab2 = st.tabs(["📊 Manage Data", "🎯 Analysis"])
 with tab1:
 
     st.subheader("Dataset Preview")
-    st.dataframe(data.head())
+    st.dataframe(data)
 
     st.divider()
 
-    # ADD STUDENT
+    # ADD
     st.markdown("## ➕ Add Student")
 
-    with st.form("add"):
+    sid = st.text_input("Student ID")
+    subject = st.text_input("Subject")
 
-        sid = st.text_input("Student ID")
-        subjects = ["Maths","Physics","Chemistry","DSA","English"]
+    att = st.number_input("Attendance",0,100)
+    mid = st.number_input("Mid Marks",0,25)
+    ass = st.number_input("Assignment",0,10)
+    quiz = st.number_input("Quiz",0,10)
+    gpa = st.number_input("GPA",0.0,10.0)
 
-        rows = []
-
-        for sub in subjects:
-            st.markdown(f"### {sub}")
-            col1,col2,col3 = st.columns(3)
-
-            att = col1.number_input("Attendance",0,100,key=sub+"a")
-            mid = col2.number_input("Mid",0,25,key=sub+"m")
-            ass = col3.number_input("Assignment",0,10,key=sub+"as")
-
-            quiz = st.number_input("Quiz",0,10,key=sub+"q")
-            gpa = st.number_input("GPA",0.0,10.0,key=sub+"g")
-
-            rows.append({
-                "student_id":sid,
-                "subject":sub,
-                "attendance":att,
-                "mid_1_marks":mid,
-                "assignment_marks":ass,
-                "quiz_marks":quiz,
-                "previous_gpa":gpa
-            })
-
-        if st.form_submit_button("Add Student"):
-            data = pd.concat([data, pd.DataFrame(rows)], ignore_index=True)
-            if os.path.exists(FILE_PATH):
-                data.to_excel(FILE_PATH,index=False)
-            st.success("Added!")
+    if st.button("Add"):
+        new = pd.DataFrame([{
+            "student_id":sid,
+            "subject":subject,
+            "attendance":att,
+            "mid_1_marks":mid,
+            "assignment_marks":ass,
+            "quiz_marks":quiz,
+            "previous_gpa":gpa
+        }])
+        data = pd.concat([data,new],ignore_index=True)
+        st.success("Added!")
 
     st.divider()
 
     # UPDATE
     st.markdown("## ✏️ Update Student")
 
-    uid = st.text_input("Student ID to update")
+    uid = st.text_input("Enter Student ID to update")
 
-    df = data[data['student_id']==uid]
+    rows = data[data['student_id']==uid]
 
-    if not df.empty:
+    for i,row in rows.iterrows():
 
-        for i,row in df.iterrows():
+        st.write(row['subject'])
 
-            st.markdown(f"### {row['subject']}")
+        new_mid = st.number_input("New Mid Marks",0,25,int(row['mid_1_marks']),key=i)
 
-            att = st.number_input("Attendance",0,100,int(row['attendance']),key="u"+str(i))
-            mid = st.number_input("Mid",0,25,int(row['mid_1_marks']),key="m"+str(i))
-
-            if st.button(f"Update {row['subject']}",key="btn"+str(i)):
-
-                data.loc[i,'attendance']=att
-                data.loc[i,'mid_1_marks']=mid
-
-                if os.path.exists(FILE_PATH):
-                    data.to_excel(FILE_PATH,index=False)
-
-                st.success("Updated!")
+        if st.button(f"Update {row['subject']}",key=f"u{i}"):
+            data.loc[i,'mid_1_marks'] = new_mid
+            st.success("Updated!")
 
     st.divider()
 
@@ -176,11 +102,23 @@ with tab1:
 
     if st.button("Delete"):
         data = data[data['student_id'] != did]
-
-        if os.path.exists(FILE_PATH):
-            data.to_excel(FILE_PATH,index=False)
-
         st.success("Deleted!")
+
+    st.divider()
+
+    # DOWNLOAD UPDATED FILE
+    st.markdown("## 💾 Download Updated Dataset")
+
+    output = BytesIO()
+    data.to_excel(output, index=False)
+    output.seek(0)
+
+    st.download_button(
+        "Download Updated Excel",
+        output,
+        "updated_student_data.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 # ===============================
 # TAB 2: ANALYSIS
@@ -194,7 +132,7 @@ with tab2:
         df = data[data['student_id']==sid]
 
         if df.empty:
-            st.error("Not found")
+            st.error("Student not found")
         else:
 
             weak=[]
@@ -218,17 +156,10 @@ with tab2:
                 else:
                     st.success("Good")
 
-                st.divider()
-
-            ratio=len(weak)/len(df)
-
-            risk="LOW" if ratio<0.3 else "MEDIUM" if ratio<0.6 else "HIGH"
+            risk="LOW" if len(weak)==0 else "MEDIUM" if len(weak)<3 else "HIGH"
             st.subheader(f"Risk: {risk}")
 
             for w in weak:
                 st.markdown(f"[Learn {w}](https://www.youtube.com/results?search_query={w})")
 
             st.bar_chart(df[['subject','mid_1_marks']].set_index('subject'))
-
-            pdf=generate_pdf(sid,weak,risk)
-            st.download_button("Download Report",pdf,f"{sid}.pdf")
