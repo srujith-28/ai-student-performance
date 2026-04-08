@@ -1,24 +1,37 @@
 import streamlit as st
 import pandas as pd
+import os
 from sklearn.linear_model import LogisticRegression
 from io import BytesIO
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
 
 st.set_page_config(layout="wide")
 st.title("🎓 AI Student Performance System")
 
 # -------------------------------
-# UPLOAD DATASET
+# FILE PATH (for permanent save)
+# -------------------------------
+FILE_PATH = "student_data_multiple_subjects.xlsx"
+
+# -------------------------------
+# LOAD DATA
 # -------------------------------
 uploaded_file = st.file_uploader("Upload Excel Dataset", type=["xlsx"])
 
-if uploaded_file is None:
+if uploaded_file is None and not os.path.exists(FILE_PATH):
     st.warning("Upload dataset to continue")
     st.stop()
 
-data = pd.read_excel(uploaded_file)
+if "data" not in st.session_state:
+    if uploaded_file is not None:
+        st.session_state.data = pd.read_excel(uploaded_file)
+    else:
+        st.session_state.data = pd.read_excel(FILE_PATH)
+
+# BACKUP (for undo)
+if "backup" not in st.session_state:
+    st.session_state.backup = st.session_state.data.copy()
+
+data = st.session_state.data
 
 # -------------------------------
 # MODEL
@@ -40,18 +53,18 @@ model.fit(X, y)
 tab1, tab2 = st.tabs(["📊 Manage Data", "🎯 Analysis"])
 
 # ===============================
-# TAB 1: ADD / UPDATE / DELETE
+# TAB 1: DATA MANAGEMENT
 # ===============================
 with tab1:
 
-    st.subheader("Dataset Preview")
+    st.subheader("Dataset")
     st.dataframe(data)
 
     st.divider()
 
-    # ===============================
-    # ADD MULTI SUBJECT STUDENT
-    # ===============================
+    # -------------------------------
+    # ADD STUDENT
+    # -------------------------------
     st.markdown("## ➕ Add Student (Multiple Subjects)")
 
     with st.form("add_student"):
@@ -84,22 +97,25 @@ with tab1:
                 "previous_gpa":gpa
             })
 
-            st.divider()
-
         if st.form_submit_button("Add Student"):
-            data = pd.concat([data, pd.DataFrame(rows)], ignore_index=True)
+
+            st.session_state.backup = st.session_state.data.copy()
+
+            new_df = pd.DataFrame(rows)
+            st.session_state.data = pd.concat([st.session_state.data, new_df], ignore_index=True)
+
             st.success("✅ Student added!")
 
     st.divider()
 
-    # ===============================
-    # UPDATE
-    # ===============================
+    # -------------------------------
+    # UPDATE FULL FIELDS
+    # -------------------------------
     st.markdown("## ✏️ Update Student")
 
-    uid = st.text_input("Enter Student ID to update")
+    uid = st.text_input("Enter Student ID")
 
-    df = data[data['student_id']==uid]
+    df = st.session_state.data[st.session_state.data['student_id']==uid]
 
     if not df.empty:
 
@@ -107,41 +123,78 @@ with tab1:
 
             st.markdown(f"### {row['subject']}")
 
-            new_mid = st.number_input("Mid Marks",0,25,int(row['mid_1_marks']),key=f"mid{i}")
+            col1,col2,col3 = st.columns(3)
+
+            att = col1.number_input("Attendance",0,100,int(row['attendance']),key=f"att{i}")
+            mid = col2.number_input("Mid",0,25,int(row['mid_1_marks']),key=f"mid{i}")
+            ass = col3.number_input("Assignment",0,10,int(row['assignment_marks']),key=f"ass{i}")
+
+            quiz = st.number_input("Quiz",0,10,int(row['quiz_marks']),key=f"quiz{i}")
+            gpa = st.number_input("GPA",0.0,10.0,float(row['previous_gpa']),key=f"gpa{i}")
 
             if st.button(f"Update {row['subject']}",key=f"btn{i}"):
-                data.loc[i,'mid_1_marks'] = new_mid
+
+                st.session_state.backup = st.session_state.data.copy()
+
+                st.session_state.data.loc[i] = [
+                    row['student_id'], row['subject'],
+                    att, mid, ass, quiz, gpa
+                ]
+
                 st.success("Updated!")
 
     st.divider()
 
-    # ===============================
+    # -------------------------------
     # DELETE
-    # ===============================
+    # -------------------------------
     st.markdown("## ❌ Delete Student")
 
     did = st.text_input("Student ID to delete")
 
     if st.button("Delete"):
-        data = data[data['student_id'] != did]
+
+        st.session_state.backup = st.session_state.data.copy()
+
+        st.session_state.data = st.session_state.data[
+            st.session_state.data['student_id'] != did
+        ]
+
         st.success("Deleted!")
 
     st.divider()
 
-    # ===============================
-    # DOWNLOAD UPDATED DATA
-    # ===============================
-    st.markdown("## 💾 Download Updated Dataset")
+    # -------------------------------
+    # UNDO FEATURE
+    # -------------------------------
+    if st.button("↩️ Undo Last Change"):
+        st.session_state.data = st.session_state.backup.copy()
+        st.success("Undo successful!")
+
+    st.divider()
+
+    # -------------------------------
+    # SAVE PERMANENTLY
+    # -------------------------------
+    if st.button("💾 Save to Excel File"):
+        st.session_state.data.to_excel(FILE_PATH, index=False)
+        st.success("Saved permanently!")
+
+    st.divider()
+
+    # -------------------------------
+    # DOWNLOAD
+    # -------------------------------
+    st.markdown("## 📥 Download Updated Excel")
 
     output = BytesIO()
-    data.to_excel(output, index=False)
+    st.session_state.data.to_excel(output, index=False)
     output.seek(0)
 
     st.download_button(
-        "Download Updated Excel",
+        "Download Excel",
         output,
-        "updated_student_data.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        "updated_student_data.xlsx"
     )
 
 # ===============================
@@ -153,7 +206,7 @@ with tab2:
 
     if st.button("Analyze"):
 
-        df = data[data['student_id']==sid]
+        df = st.session_state.data[st.session_state.data['student_id']==sid]
 
         if df.empty:
             st.error("Student not found")
@@ -172,16 +225,16 @@ with tab2:
                     r['previous_gpa']
                 ]],columns=X.columns))[0][1]*100
 
-                st.metric(r['subject'],r['mid_1_marks'])
+                st.metric(r['subject'], r['mid_1_marks'])
 
-                if r['mid_1_marks']<avg:
+                if r['mid_1_marks'] < avg:
                     weak.append(r['subject'])
                     st.error("Weak")
                 else:
                     st.success("Good")
 
-            risk="LOW" if len(weak)==0 else "MEDIUM" if len(weak)<3 else "HIGH"
-            st.subheader(f"Risk: {risk}")
+            risk = "LOW" if len(weak)==0 else "MEDIUM" if len(weak)<3 else "HIGH"
+            st.subheader(f"Risk Level: {risk}")
 
             for w in weak:
                 st.markdown(f"[Learn {w}](https://www.youtube.com/results?search_query={w})")
