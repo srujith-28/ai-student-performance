@@ -21,7 +21,7 @@ if uploaded_file is None:
 data = pd.read_excel(uploaded_file)
 
 # -------------------------------
-# LABEL + MODEL
+# MODEL
 # -------------------------------
 data['performance_status'] = data.apply(
     lambda r: "Poor" if r['mid_1_marks'] < 12 or r['attendance'] < 65 else "Good",
@@ -49,53 +49,75 @@ with tab1:
 
     st.divider()
 
-    # ADD
-    st.markdown("## ➕ Add Student")
+    # ===============================
+    # ADD MULTI SUBJECT STUDENT
+    # ===============================
+    st.markdown("## ➕ Add Student (Multiple Subjects)")
 
-    sid = st.text_input("Student ID")
-    subject = st.text_input("Subject")
+    with st.form("add_student"):
 
-    att = st.number_input("Attendance",0,100)
-    mid = st.number_input("Mid Marks",0,25)
-    ass = st.number_input("Assignment",0,10)
-    quiz = st.number_input("Quiz",0,10)
-    gpa = st.number_input("GPA",0.0,10.0)
+        sid = st.text_input("Student ID")
 
-    if st.button("Add"):
-        new = pd.DataFrame([{
-            "student_id":sid,
-            "subject":subject,
-            "attendance":att,
-            "mid_1_marks":mid,
-            "assignment_marks":ass,
-            "quiz_marks":quiz,
-            "previous_gpa":gpa
-        }])
-        data = pd.concat([data,new],ignore_index=True)
-        st.success("Added!")
+        subjects = ["Maths","Physics","Chemistry","DSA","English"]
+        rows = []
+
+        for sub in subjects:
+
+            st.markdown(f"### {sub}")
+
+            col1,col2,col3 = st.columns(3)
+
+            att = col1.number_input(f"{sub} Attendance",0,100,key=sub+"a")
+            mid = col2.number_input(f"{sub} Mid Marks",0,25,key=sub+"m")
+            ass = col3.number_input(f"{sub} Assignment",0,10,key=sub+"as")
+
+            quiz = st.number_input(f"{sub} Quiz",0,10,key=sub+"q")
+            gpa = st.number_input(f"{sub} GPA",0.0,10.0,key=sub+"g")
+
+            rows.append({
+                "student_id":sid,
+                "subject":sub,
+                "attendance":att,
+                "mid_1_marks":mid,
+                "assignment_marks":ass,
+                "quiz_marks":quiz,
+                "previous_gpa":gpa
+            })
+
+            st.divider()
+
+        if st.form_submit_button("Add Student"):
+            data = pd.concat([data, pd.DataFrame(rows)], ignore_index=True)
+            st.success("✅ Student added!")
 
     st.divider()
 
+    # ===============================
     # UPDATE
+    # ===============================
     st.markdown("## ✏️ Update Student")
 
     uid = st.text_input("Enter Student ID to update")
 
-    rows = data[data['student_id']==uid]
+    df = data[data['student_id']==uid]
 
-    for i,row in rows.iterrows():
+    if not df.empty:
 
-        st.write(row['subject'])
+        for i,row in df.iterrows():
 
-        new_mid = st.number_input("New Mid Marks",0,25,int(row['mid_1_marks']),key=i)
+            st.markdown(f"### {row['subject']}")
 
-        if st.button(f"Update {row['subject']}",key=f"u{i}"):
-            data.loc[i,'mid_1_marks'] = new_mid
-            st.success("Updated!")
+            new_mid = st.number_input("Mid Marks",0,25,int(row['mid_1_marks']),key=f"mid{i}")
+
+            if st.button(f"Update {row['subject']}",key=f"btn{i}"):
+                data.loc[i,'mid_1_marks'] = new_mid
+                st.success("Updated!")
 
     st.divider()
 
+    # ===============================
     # DELETE
+    # ===============================
     st.markdown("## ❌ Delete Student")
 
     did = st.text_input("Student ID to delete")
@@ -106,7 +128,9 @@ with tab1:
 
     st.divider()
 
-    # DOWNLOAD UPDATED FILE
+    # ===============================
+    # DOWNLOAD UPDATED DATA
+    # ===============================
     st.markdown("## 💾 Download Updated Dataset")
 
     output = BytesIO()
