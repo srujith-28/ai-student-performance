@@ -3,11 +3,36 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from io import BytesIO
 
-st.set_page_config(layout="wide")
-st.title("🎓 AI Student Performance System")
+st.set_page_config(page_title="AI Dashboard", layout="wide")
 
 # -------------------------------
-# UPLOAD DATASET
+# LOGIN SYSTEM
+# -------------------------------
+if "login" not in st.session_state:
+    st.session_state.login = False
+
+if not st.session_state.login:
+    st.title("🔐 Login")
+
+    user = st.text_input("Username")
+    pwd = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        if user == "admin" and pwd == "admin123":
+            st.session_state.login = True
+            st.rerun()
+        else:
+            st.error("Invalid credentials")
+
+    st.stop()
+
+# -------------------------------
+# MAIN TITLE
+# -------------------------------
+st.title("🎓 AI Student Performance Dashboard")
+
+# -------------------------------
+# UPLOAD DATA
 # -------------------------------
 uploaded_file = st.file_uploader("Upload Excel Dataset", type=["xlsx"])
 
@@ -27,13 +52,19 @@ if "backup" not in st.session_state:
 data = st.session_state.data
 
 # -------------------------------
+# LABEL FUNCTION
+# -------------------------------
+def update_labels():
+    st.session_state.data['performance_status'] = st.session_state.data.apply(
+        lambda r: "Poor" if r['mid_1_marks'] < 12 or r['attendance'] < 65 else "Good",
+        axis=1
+    )
+
+update_labels()
+
+# -------------------------------
 # MODEL
 # -------------------------------
-data['performance_status'] = data.apply(
-    lambda r: "Poor" if r['mid_1_marks'] < 12 or r['attendance'] < 65 else "Good",
-    axis=1
-)
-
 X = data[['attendance','mid_1_marks','assignment_marks','quiz_marks','previous_gpa']]
 y = data['performance_status'].map({'Good':1,'Poor':0})
 
@@ -41,24 +72,34 @@ model = LogisticRegression()
 model.fit(X, y)
 
 # -------------------------------
+# DASHBOARD CARDS
+# -------------------------------
+st.subheader("📊 Overview")
+
+col1, col2, col3 = st.columns(3)
+
+col1.metric("Total Records", len(data))
+col2.metric("Students", data['student_id'].nunique())
+col3.metric("Avg Marks", round(data['mid_1_marks'].mean(),2))
+
+st.divider()
+
+# -------------------------------
 # TABS
 # -------------------------------
 tab1, tab2 = st.tabs(["📊 Manage Data", "🎯 Analysis"])
 
 # ===============================
-# TAB 1: MANAGE DATA
+# TAB 1: DATA MANAGEMENT
 # ===============================
 with tab1:
 
-    st.subheader("Dataset Preview")
     st.dataframe(data)
 
     st.divider()
 
-    # -------------------------------
-    # ADD STUDENT
-    # -------------------------------
-    st.markdown("## ➕ Add Student (Multiple Subjects)")
+    # ADD
+    st.markdown("## ➕ Add Student")
 
     with st.form("add_form"):
 
@@ -68,7 +109,6 @@ with tab1:
         rows = []
 
         for sub in subjects:
-
             st.markdown(f"### {sub}")
 
             col1,col2,col3 = st.columns(3)
@@ -91,22 +131,17 @@ with tab1:
             })
 
         if st.form_submit_button("Add Student"):
-
-            if sid.strip() == "":
-                st.warning("⚠️ Enter Student ID")
+            if sid.strip()=="":
+                st.warning("Enter Student ID")
             else:
                 st.session_state.backup = st.session_state.data.copy()
-
-                new_df = pd.DataFrame(rows)
-                st.session_state.data = pd.concat([st.session_state.data, new_df], ignore_index=True)
-
-                st.success("✅ Student added")
+                st.session_state.data = pd.concat([st.session_state.data, pd.DataFrame(rows)], ignore_index=True)
+                update_labels()
+                st.success("Added successfully")
 
     st.divider()
 
-    # -------------------------------
     # UPDATE
-    # -------------------------------
     st.markdown("## ✏️ Update Student")
 
     uid = st.text_input("Enter Student ID", key="update_id")
@@ -132,63 +167,48 @@ with tab1:
 
                 st.session_state.backup = st.session_state.data.copy()
 
-                st.session_state.data.loc[i] = [
-                    row['student_id'], row['subject'],
-                    att, mid, ass, quiz, gpa
-                ]
+                st.session_state.data.loc[i,'attendance'] = att
+                st.session_state.data.loc[i,'mid_1_marks'] = mid
+                st.session_state.data.loc[i,'assignment_marks'] = ass
+                st.session_state.data.loc[i,'quiz_marks'] = quiz
+                st.session_state.data.loc[i,'previous_gpa'] = gpa
 
-                st.success("✅ Updated")
+                update_labels()
+                st.success("Updated")
 
     st.divider()
 
-    # -------------------------------
     # DELETE
-    # -------------------------------
     st.markdown("## ❌ Delete Student")
 
-    did = st.text_input("Student ID to delete", key="delete_id")
+    did = st.text_input("Student ID", key="delete_id")
 
     if st.button("Delete", key="delete_btn"):
 
-        if did.strip() == "":
-            st.warning("⚠️ Enter Student ID")
+        if did.strip()=="":
+            st.warning("Enter ID")
         elif did not in st.session_state.data['student_id'].values:
-            st.error("❌ Student not found")
+            st.error("Not found")
         else:
             st.session_state.backup = st.session_state.data.copy()
-
-            st.session_state.data = st.session_state.data[
-                st.session_state.data['student_id'] != did
-            ]
-
-            st.success("✅ Deleted")
+            st.session_state.data = st.session_state.data[st.session_state.data['student_id']!=did]
+            st.success("Deleted")
 
     st.divider()
 
-    # -------------------------------
     # UNDO
-    # -------------------------------
     if st.button("↩️ Undo", key="undo_btn"):
         st.session_state.data = st.session_state.backup.copy()
         st.success("Undo done")
 
     st.divider()
 
-    # -------------------------------
     # DOWNLOAD
-    # -------------------------------
-    st.markdown("## 📥 Download Updated Excel")
-
     output = BytesIO()
-    st.session_state.data.to_excel(output, index=False)
+    st.session_state.data.to_excel(output,index=False)
     output.seek(0)
 
-    st.download_button(
-        "Download Excel",
-        output,
-        "updated_student_data.xlsx",
-        key="download_btn"
-    )
+    st.download_button("📥 Download Excel",output,"updated_data.xlsx")
 
 # ===============================
 # TAB 2: ANALYSIS
@@ -229,7 +249,9 @@ with tab2:
             risk = "LOW" if len(weak)==0 else "MEDIUM" if len(weak)<3 else "HIGH"
             st.subheader(f"Risk Level: {risk}")
 
+            st.markdown("## 🎥 Recommendations")
             for w in weak:
-                st.markdown(f"[Learn {w}](https://www.youtube.com/results?search_query={w})")
+                st.markdown(f"[Learn {w}](https://www.youtube.com/results?search_query={w}+important+topics)")
 
+            st.markdown("## 📊 Performance Chart")
             st.bar_chart(df[['subject','mid_1_marks']].set_index('subject'))
