@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import os
 from sklearn.linear_model import LogisticRegression
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
@@ -13,15 +14,25 @@ st.set_page_config(page_title="AI Academic Dashboard", layout="wide")
 st.title("🎓 AI-Based Student Academic Performance System")
 
 # -------------------------------
-# LOAD STATIC DATASET
+# FILE PATH
 # -------------------------------
 FILE_PATH = "student_data_multiple_subjects.xlsx"
 
-try:
+# -------------------------------
+# LOAD DATA (FIXED)
+# -------------------------------
+if os.path.exists(FILE_PATH):
     data = pd.read_excel(FILE_PATH)
-except:
-    st.error("Dataset file not found!")
-    st.stop()
+    st.success("Loaded local dataset")
+else:
+    st.warning("Local dataset not found. Please upload file.")
+    uploaded_file = st.file_uploader("Upload Dataset", type=["xlsx"])
+
+    if uploaded_file is not None:
+        data = pd.read_excel(uploaded_file)
+        st.success("Uploaded dataset loaded")
+    else:
+        st.stop()
 
 # -------------------------------
 # PDF GENERATOR
@@ -85,7 +96,7 @@ with tab1:
     st.divider()
 
     # -------------------------------
-    # ADD STUDENT (SAVED TO EXCEL)
+    # ADD STUDENT
     # -------------------------------
     st.markdown("## ➕ Add New Student Record")
 
@@ -117,13 +128,14 @@ with tab1:
                 "previous_gpa": gpa
             }])
 
-            # Append to dataset
             data = pd.concat([data, new_row], ignore_index=True)
 
-            # Save permanently to Excel
-            data.to_excel(FILE_PATH, index=False)
-
-            st.success("✅ Student added and saved to dataset!")
+            # Save ONLY if local file exists
+            if os.path.exists(FILE_PATH):
+                data.to_excel(FILE_PATH, index=False)
+                st.success("✅ Student added and saved to Excel!")
+            else:
+                st.success("✅ Student added (not saved locally)")
 
 # -------------------------------
 # TAB 2: ANALYSIS
