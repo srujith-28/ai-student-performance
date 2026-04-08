@@ -6,14 +6,13 @@ from io import BytesIO
 st.set_page_config(page_title="AI Dashboard", layout="wide")
 
 # -------------------------------
-# LOGIN SYSTEM
+# LOGIN
 # -------------------------------
 if "login" not in st.session_state:
     st.session_state.login = False
 
 if not st.session_state.login:
     st.title("🔐 Login")
-
     user = st.text_input("Username")
     pwd = st.text_input("Password", type="password")
 
@@ -27,12 +26,12 @@ if not st.session_state.login:
     st.stop()
 
 # -------------------------------
-# MAIN TITLE
+# TITLE
 # -------------------------------
 st.title("🎓 AI Student Performance Dashboard")
 
 # -------------------------------
-# UPLOAD DATA
+# UPLOAD
 # -------------------------------
 uploaded_file = st.file_uploader("Upload Excel Dataset", type=["xlsx"])
 
@@ -72,12 +71,10 @@ model = LogisticRegression()
 model.fit(X, y)
 
 # -------------------------------
-# DASHBOARD CARDS
+# DASHBOARD METRICS
 # -------------------------------
 st.subheader("📊 Overview")
-
 col1, col2, col3 = st.columns(3)
-
 col1.metric("Total Records", len(data))
 col2.metric("Students", data['student_id'].nunique())
 col3.metric("Avg Marks", round(data['mid_1_marks'].mean(),2))
@@ -90,7 +87,7 @@ st.divider()
 tab1, tab2 = st.tabs(["📊 Manage Data", "🎯 Analysis"])
 
 # ===============================
-# TAB 1: DATA MANAGEMENT
+# TAB 1: MANAGE DATA
 # ===============================
 with tab1:
 
@@ -102,7 +99,6 @@ with tab1:
     st.markdown("## ➕ Add Student")
 
     with st.form("add_form"):
-
         sid = st.text_input("Student ID", key="add_id")
 
         subjects = ["Maths","Physics","Chemistry","DSA","English"]
@@ -110,7 +106,6 @@ with tab1:
 
         for sub in subjects:
             st.markdown(f"### {sub}")
-
             col1,col2,col3 = st.columns(3)
 
             att = col1.number_input(f"{sub} Attendance",0,100,key=f"{sub}_a")
@@ -137,7 +132,7 @@ with tab1:
                 st.session_state.backup = st.session_state.data.copy()
                 st.session_state.data = pd.concat([st.session_state.data, pd.DataFrame(rows)], ignore_index=True)
                 update_labels()
-                st.success("Added successfully")
+                st.success("Student added")
 
     st.divider()
 
@@ -145,15 +140,12 @@ with tab1:
     st.markdown("## ✏️ Update Student")
 
     uid = st.text_input("Enter Student ID", key="update_id")
-
     df = st.session_state.data[st.session_state.data['student_id']==uid]
 
     if not df.empty:
-
         for i,row in df.iterrows():
 
             st.markdown(f"### {row['subject']}")
-
             col1,col2,col3 = st.columns(3)
 
             att = col1.number_input("Attendance",0,100,int(row['attendance']),key=f"att_{i}")
@@ -184,7 +176,6 @@ with tab1:
     did = st.text_input("Student ID", key="delete_id")
 
     if st.button("Delete", key="delete_btn"):
-
         if did.strip()=="":
             st.warning("Enter ID")
         elif did not in st.session_state.data['student_id'].values:
@@ -251,7 +242,51 @@ with tab2:
 
             st.markdown("## 🎥 Recommendations")
             for w in weak:
-                st.markdown(f"[Learn {w}](https://www.youtube.com/results?search_query={w}+important+topics)")
+                st.markdown(f"[Learn {w}](https://www.youtube.com/results?search_query={w})")
 
-            st.markdown("## 📊 Performance Chart")
             st.bar_chart(df[['subject','mid_1_marks']].set_index('subject'))
+
+    st.divider()
+
+    # ===============================
+    # 📊 COMPARISON FEATURE
+    # ===============================
+    st.markdown("## 📊 Class Comparison & Weak Students")
+
+    students = st.session_state.data['student_id'].unique()
+
+    selected_students = st.multiselect(
+        "Select Students",
+        students,
+        default=list(students)[:3],
+        key="compare_students"
+    )
+
+    if selected_students:
+
+        comp = st.session_state.data[
+            st.session_state.data['student_id'].isin(selected_students)
+        ]
+
+        avg_marks = comp.groupby('student_id')['mid_1_marks'].mean().reset_index()
+
+        st.bar_chart(avg_marks.set_index('student_id'))
+
+        threshold = avg_marks['mid_1_marks'].mean()
+
+        weak_students = avg_marks[avg_marks['mid_1_marks'] < threshold]
+        top_students = avg_marks[avg_marks['mid_1_marks'] >= threshold]
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("### ⚠️ Weak Students")
+            for _, r in weak_students.iterrows():
+                st.error(f"{r['student_id']} → {round(r['mid_1_marks'],2)}")
+
+        with col2:
+            st.markdown("### 🏆 Top Students")
+            for _, r in top_students.iterrows():
+                st.success(f"{r['student_id']} → {round(r['mid_1_marks'],2)}")
+
+        st.metric("Class Average", round(threshold,2))
