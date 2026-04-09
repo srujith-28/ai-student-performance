@@ -31,7 +31,7 @@ if not st.session_state.login:
 st.title("🎓 AI Student Performance Dashboard")
 
 # -------------------------------
-# UPLOAD
+# UPLOAD DATA
 # -------------------------------
 uploaded_file = st.file_uploader("Upload Excel Dataset", type=["xlsx"])
 
@@ -84,7 +84,7 @@ st.divider()
 # -------------------------------
 # TABS
 # -------------------------------
-tab1, tab2 = st.tabs(["📊 Manage Data", "🎯 Analysis"])
+tab1, tab2, tab3 = st.tabs(["📊 Manage Data", "🎯 Analysis", "📊 Comparison"])
 
 # ===============================
 # TAB 1: MANAGE DATA
@@ -246,30 +246,48 @@ with tab2:
 
             st.bar_chart(df[['subject','mid_1_marks']].set_index('subject'))
 
-    st.divider()
+# ===============================
+# TAB 3: COMPARISON
+# ===============================
+with tab3:
 
-    # ===============================
-    # 📊 COMPARISON FEATURE
-    # ===============================
-    st.markdown("## 📊 Class Comparison & Weak Students")
+    st.markdown("## 📊 Comparison Module")
 
-    students = st.session_state.data['student_id'].unique()
+    option = st.radio(
+        "Select Data Source",
+        ["Use Existing Data", "Upload New Dataset"],
+        key="compare_option"
+    )
+
+    if option == "Use Existing Data":
+        comp_data = st.session_state.data
+    else:
+        uploaded_comp = st.file_uploader("Upload Comparison Dataset", type=["xlsx"], key="comp_upload")
+
+        if uploaded_comp is not None:
+            comp_data = pd.read_excel(uploaded_comp)
+        else:
+            st.warning("Upload dataset to continue")
+            st.stop()
+
+    st.dataframe(comp_data)
+
+    students = comp_data['student_id'].unique()
 
     selected_students = st.multiselect(
         "Select Students",
         students,
         default=list(students)[:3],
-        key="compare_students"
+        key="compare_students_tab3"
     )
 
     if selected_students:
 
-        comp = st.session_state.data[
-            st.session_state.data['student_id'].isin(selected_students)
-        ]
+        filtered = comp_data[comp_data['student_id'].isin(selected_students)]
 
-        avg_marks = comp.groupby('student_id')['mid_1_marks'].mean().reset_index()
+        avg_marks = filtered.groupby('student_id')['mid_1_marks'].mean().reset_index()
 
+        st.markdown("### 📊 Average Comparison")
         st.bar_chart(avg_marks.set_index('student_id'))
 
         threshold = avg_marks['mid_1_marks'].mean()
